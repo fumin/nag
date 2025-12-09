@@ -1,0 +1,4 @@
+github.com/jba/omap v0.1.0 h1:ZIc07j0RiPT4ux9DlcmpTRJpbYcU7s8ckPVXsI3bGCI=
+github.com/jba/omap v0.1.0/go.mod h1:j33OqPlOfZuNNjSLWzOc+I3jboQT/CpoDvwvprsjFtk=
+github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

@@ -1,0 +1,10 @@
+; cat rabbit | bergman | sed -n '/Rabbit has finishied jumping. GB is/,$p' | tail -n +2 | head -n -4
+(noncommify)
+(setmaxdeg 999999)
+(rabbit 1 1 999999)
+vars b, a;
+a^2-1,
+b^3-1,
+a*b*a*b*a*b*b*a*b*b*a*b*a*b*a*b*b*a*b*b-1,
+;
+(quit)
