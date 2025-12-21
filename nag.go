@@ -11,6 +11,7 @@ import (
 	"cmp"
 	"fmt"
 	"iter"
+	"math"
 	"math/big"
 	"slices"
 	"strings"
@@ -378,13 +379,13 @@ func Divide(quotient [][]Quotient, f *Polynomial, g []*Polynomial) (remainder *P
 	return p, quotient
 }
 
-// Buchberger returns the Gröbner basis of an ideal g, using the Buchberger algorithm.
-// In the noncummutative case, a Gröbner basis may not be finite and therefore may need to be truncated.
-// Buchberger truncates the returned basis when maxiter is reached, and returns complete as false.
+// Buchberger returns the Gröbner basis of the ideal g, using the Buchberger algorithm.
+// For noncummutative algebras, a Gröbner basis may not be finite and therefore only a partial basis can be computed.
+// In this case, upon reaching maxIter without a complete basis, Buchberger sets complete to false.
 // For more details, please see Theorem 4.2.24, Xiu Xingqiang.
 //
 // Xiu, Xingqiang. "Non-commutative Gröbner bases and applications." PhD diss., Universität Passau, 2012.
-func Buchberger(g []*Polynomial, maxiter int) (outG []*Polynomial, complete bool) {
+func Buchberger(g []*Polynomial, maxIter int) (basis []*Polynomial, complete bool) {
 	// Buffers.
 	r0 := big.NewRat(0, 1)
 	buf := &Monomial{}
@@ -413,7 +414,7 @@ func Buchberger(g []*Polynomial, maxiter int) (outG []*Polynomial, complete bool
 		b = addObstructions(b, gl, buf)
 	}
 
-	for range maxiter {
+	for range maxIter {
 		if len(b) == 0 {
 			complete = true
 			break
@@ -427,13 +428,7 @@ func Buchberger(g []*Polynomial, maxiter int) (outG []*Polynomial, complete bool
 		b = b[:len(b)-1]
 
 		// Compute S-polynomial of oij.
-		gi, gj := g[oij.i], g[oij.j]
-		lcgi := gi.LeadingTerm().Coefficient
-		lcgj := gj.LeadingTerm().Coefficient
-		s := NewPolynomial(g[0].order)
-		s.SymbolStringer = g[0].SymbolStringer
-		s.add(1, r0.Inv(lcgi), oij.iLeft, gi, oij.iRight)
-		s.add(-1, r0.Inv(lcgj), oij.jLeft, gj, oij.jRight)
+		s := sPolynomial(oij, g, r0)
 		deleteUnwanted()
 		sP, _ := Divide(nil, s, g)
 		restoreUnwanted()
@@ -459,14 +454,99 @@ func Buchberger(g []*Polynomial, maxiter int) (outG []*Polynomial, complete bool
 	// Remove unwanted polynomials.
 	deleteUnwanted()
 	g = slices.DeleteFunc(g, func(gi *Polynomial) bool { return gi == nil })
-	// Make basis monic.
 	g = interreduce(g)
+	// Make basis monic.
 	for i := range g {
 		lc := g[i].LeadingTerm().Coefficient
 		g[i].mulScalar(r0.Inv(lc), g[i])
 	}
 	slices.SortFunc(g, func(a, b *Polynomial) int { return a.Cmp(b) })
 	return g, complete
+}
+
+// BuchbergerHomogeneous returns the Gröbner basis of the [homogeneous] ideal g, using the Buchberger algorithm.
+// All basis polynomials with degree less or equal than maxDeg are returned.
+// For more details, please see Theorem 4.3.16, Xiu Xingqiang.
+//
+// Xiu, Xingqiang. "Non-commutative Gröbner bases and applications." PhD diss., Universität Passau, 2012.
+//
+// [homogeneous]: https://en.wikipedia.org/wiki/Homogeneous_polynomial
+func BuchbergerHomogeneous(g []*Polynomial, maxDeg int) (basis []*Polynomial, complete bool) {
+	// Check that g is a homogeneous ideal.
+	for _, f := range g {
+		if !homogeneous(f) {
+			panic(fmt.Sprintf("non-homogeneous polynomial %v", f))
+		}
+	}
+
+	// Buffers.
+	r0 := big.NewRat(0, 1)
+	m0 := &Monomial{}
+	p0 := NewPolynomial(g[0].order)
+
+	// Make a copy of g since we will be deleting from it.
+	newG := make([]*Polynomial, len(g))
+	copy(newG, g)
+	g = newG
+	// b is the set of obstructions.
+	var b []obstruction
+	// gd and bd are subsets of g and b with degree d.
+	var gd []*Polynomial
+	var bd []obstruction
+	var numDeleted int
+
+	for {
+		if len(g) == 0 && len(b) == 0 {
+			if numDeleted == 0 {
+				complete = true
+			}
+			break
+		}
+		var stMax bool
+		g, gd, b, bd, stMax = smallestDegreeSet(g, gd, b, bd, maxDeg)
+		if !stMax {
+			break
+		}
+
+		for len(gd) > 0 {
+			gL := gd[len(gd)-1]
+			gd = gd[:len(gd)-1]
+			gP, _ := Divide(nil, p0.Set(gL), basis)
+			if gP.m.Len() == 0 {
+				continue
+			}
+
+			basis = append(basis, gP)
+			b = addObstructions(b, basis, m0)
+			var nDel int
+			b, nDel = deleteHighDegObs(b, basis, maxDeg, r0)
+			numDeleted += nDel
+		}
+
+		for len(bd) > 0 {
+			o := bd[len(bd)-1]
+			bd = bd[:len(bd)-1]
+			sP, _ := Divide(nil, p0.Set(o.sPolynomial), basis)
+			if sP.m.Len() == 0 {
+				continue
+			}
+
+			basis = append(basis, sP)
+			b = addObstructions(b, basis, m0)
+			var nDel int
+			b, nDel = deleteHighDegObs(b, basis, maxDeg, r0)
+			numDeleted += nDel
+		}
+	}
+
+	basis = interreduce(basis)
+	// Make basis monic.
+	for i := range basis {
+		lc := basis[i].LeadingTerm().Coefficient
+		basis[i].mulScalar(r0.Inv(lc), basis[i])
+	}
+	slices.SortFunc(basis, func(a, b *Polynomial) int { return a.Cmp(b) })
+	return basis, complete
 }
 
 func interreduce(g []*Polynomial) []*Polynomial {
@@ -496,15 +576,79 @@ func interreduce(g []*Polynomial) []*Polynomial {
 	return slices.DeleteFunc(g, func(x *Polynomial) bool { return x == nil })
 }
 
+func smallestDegreeSet(g, gd []*Polynomial, b, bd []obstruction, maxDeg int) ([]*Polynomial, []*Polynomial, []obstruction, []obstruction, bool) {
+	// Compute the smallest degree.
+	var d int = math.MaxInt
+	for _, f := range g {
+		d = min(d, len(f.LeadingTerm().Monomial))
+	}
+	for _, o := range b {
+		d = min(d, len(o.sPolynomial.LeadingTerm().Monomial))
+	}
+	if d > maxDeg {
+		return nil, nil, nil, nil, false
+	}
+
+	// Extract from g.
+	gd = gd[:0]
+	for i, f := range g {
+		if len(f.LeadingTerm().Monomial) == d {
+			gd = append(gd, f)
+			g[i] = nil
+		}
+	}
+	g = slices.DeleteFunc(g, func(f *Polynomial) bool { return f == nil })
+
+	//Extract from b.
+	bd = bd[:0]
+	for i, o := range b {
+		if len(o.sPolynomial.LeadingTerm().Monomial) == d {
+			bd = append(bd, o)
+			b[i].sPolynomial = nil
+		}
+	}
+	b = slices.DeleteFunc(b, func(o obstruction) bool { return o.sPolynomial == nil })
+
+	return g, gd, b, bd, true
+}
+
+func deleteHighDegObs(b []obstruction, basis []*Polynomial, maxDeg int, r0 *big.Rat) ([]obstruction, int) {
+	var numDeleted int
+	for i := len(b) - 1; i >= 0; i-- {
+		if b[i].sPolynomial != nil {
+			break
+		}
+		b[i].sPolynomial = sPolynomial(b[i], basis, r0)
+		if len(b[i].sPolynomial.LeadingTerm().Monomial) > maxDeg {
+			b[i].removed = true
+			numDeleted++
+		}
+	}
+	b = slices.DeleteFunc(b, func(o obstruction) bool { return o.removed })
+	return b, numDeleted
+}
+
 type obstruction struct {
-	i      int
-	j      int
-	iLeft  Monomial
-	iRight Monomial
-	jLeft  Monomial
-	jRight Monomial
+	i           int
+	j           int
+	iLeft       Monomial
+	iRight      Monomial
+	jLeft       Monomial
+	jRight      Monomial
+	sPolynomial *Polynomial
 
 	removed bool
+}
+
+func sPolynomial(o obstruction, g []*Polynomial, buf *big.Rat) *Polynomial {
+	gi, gj := g[o.i], g[o.j]
+	lcgi := gi.LeadingTerm().Coefficient
+	lcgj := gj.LeadingTerm().Coefficient
+	s := NewPolynomial(gi.order)
+	s.SymbolStringer = gi.SymbolStringer
+	s.add(1, buf.Inv(lcgi), o.iLeft, gi, o.iRight)
+	s.add(-1, buf.Inv(lcgj), o.jLeft, gj, o.jRight)
+	return s
 }
 
 func delRemoved(sPObs, obs []obstruction) ([]obstruction, []obstruction) {
@@ -793,6 +937,17 @@ func centerObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstructi
 	}
 
 	return obs
+}
+
+func homogeneous(x *Polynomial) bool {
+	for i := range x.m.Len() - 1 {
+		im, _ := x.m.At(i)
+		i1m, _ := x.m.At(i + 1)
+		if len(im) != len(i1m) {
+			return false
+		}
+	}
+	return true
 }
 
 func englishSymbolStringer(s Symbol) string {

@@ -270,6 +270,53 @@ func ExampleBuchberger() {
 	// Basis is complete: true
 }
 
+func ExampleBuchbergerHomogeneous() {
+	ideal := []string{
+		"x^2 - 2y^2",
+		"xy - 3z^2",
+	}
+	variables := map[string]nag.Symbol{"x": 1, "y": 2, "z": 3}
+	idealP := make([]*nag.Polynomial, len(ideal))
+	for i := range ideal {
+		idealP[i], _ = nag.Parse(variables, nag.Deglex, ideal[i])
+	}
+
+	// Run the homogeneous Buchberger algorithm and truncate at degree 3.
+	var maxDeg int = 3
+	basis3, complete := nag.BuchbergerHomogeneous(idealP, maxDeg)
+	fmt.Printf("Gröbner basis truncated at degree %d:\n", maxDeg)
+	for _, b := range basis3 {
+		fmt.Println(" ", b)
+	}
+	fmt.Println("Basis is complete:", complete)
+	fmt.Println("")
+
+	// Run Buchberger again and truncate at a higher degree.
+	// We will get the full basis this time round, since maxDeg is higher than the basis' maximum degree.
+	maxDeg = 5
+	basis, complete := nag.BuchbergerHomogeneous(idealP, maxDeg)
+	fmt.Printf("Gröbner basis truncated at degree %d:\n", maxDeg)
+	// Skip printing bases that have been printed above.
+	fmt.Printf("  ...\n")
+	for _, b := range basis[len(basis3):] {
+		fmt.Println(" ", b)
+	}
+	fmt.Println("Basis is complete:", complete)
+
+	// Output:
+	// Gröbner basis truncated at degree 3:
+	//   y^2-1/2x^2
+	//   z^2-1/3xy
+	//   yx^2-x^2y
+	//   zxy-xyz
+	// Basis is complete: false
+	//
+	// Gröbner basis truncated at degree 5:
+	//   ...
+	//   zx^3-2xyzy
+	// Basis is complete: true
+}
+
 func ExampleParse() {
 	pStr := "-x^2y^3 + 5/3(y-x)x"
 
