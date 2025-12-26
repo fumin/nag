@@ -13,11 +13,79 @@ import (
 	"iter"
 	"math"
 	"math/big"
+	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/jba/omap"
 )
+
+// A Field is an element whose addition and multiplication operations satisfy the [field] axioms.
+//
+// [field]: https://en.wikipedia.org/wiki/Field_(mathematics)
+type Field[T any] interface {
+	// NewZero returns the additive identity of the field.
+	NewZero() T
+	// NewOne returns the multiplicative identity of the field.
+	NewOne() T
+
+	// Equal reports whether x and y are equal, where x is the method receiver.
+	Equal(y T) bool
+	// Add sets z to the sum x+y and returns z, where z is the method receiver.
+	Add(x, y T) T
+	// Sub sets z to the difference x-y and returns z, where z is the method receiver.
+	Sub(x, y T) T
+	// Mul sets z to the product x*y and returns z, where z is the method receiver.
+	Mul(x, y T) T
+	// Div sets z to the quotient x/y and returns z, where z is the method receiver.
+	Div(x, y T) T
+	// Inv sets z to 1/x and returns z, where z is the method receiver.
+	Inv(x T) T
+
+	// String returns the string representation.
+	String() string
+}
+
+// A Rat represents a quotient of arbitrary precision.
+type Rat struct{ *big.Rat }
+
+// NewRat creates a new [Rat] with numerator a and denominator b.
+func NewRat(a, b int64) *Rat { return &Rat{big.NewRat(a, b)} }
+
+// NewZero returns the additive identity 0.
+func (x *Rat) NewZero() *Rat {
+	return &Rat{big.NewRat(0, 1)}
+}
+
+// NewOne returns the multiplicative identity 1.
+func (x *Rat) NewOne() *Rat {
+	return &Rat{big.NewRat(1, 1)}
+}
+
+// Add sets z to the sum x+y and returns z.
+func (z *Rat) Add(x, y *Rat) *Rat { return &Rat{z.Rat.Add(x.Rat, y.Rat)} }
+
+// Sub sets z to the difference x-y and returns z.
+func (z *Rat) Sub(x, y *Rat) *Rat { return &Rat{z.Rat.Sub(x.Rat, y.Rat)} }
+
+// Mul sets z to the product x*y and returns z.
+func (z *Rat) Mul(x, y *Rat) *Rat { return &Rat{z.Rat.Mul(x.Rat, y.Rat)} }
+
+// Div sets z to the quotient x/y and returns z. If y == 0, Div panics.
+func (z *Rat) Div(x, y *Rat) *Rat { return &Rat{z.Rat.Quo(x.Rat, y.Rat)} }
+
+// Inv sets z to 1/x and returns z. If x == 0, Inv panics.
+func (z *Rat) Inv(x *Rat) *Rat { return &Rat{z.Rat.Inv(x.Rat)} }
+
+// Equal reports whether x and y are equal.
+func (x *Rat) Equal(y *Rat) bool {
+	return x.Rat.Cmp(y.Rat) == 0
+}
+
+// String returns a string representation of x in the form "a/b" if b != 1, and in the form "a" if b == 1.
+func (x *Rat) String() string {
+	return x.RatString()
+}
 
 // A Symbol is a variable in a monomial.
 // This definition implies that the maximum number of variables supported by this package is 256.
@@ -65,43 +133,47 @@ func ElimOrder() Order {
 }
 
 // A PolynomialTerm is a term in a polynomial.
-type PolynomialTerm struct {
-	Coefficient *big.Rat
+type PolynomialTerm[K Field[K]] struct {
+	Coefficient K
 	Monomial    Monomial
 }
 
 // A Polynomial is a polynomial of noncommutative variables.
-type Polynomial struct {
+type Polynomial[K Field[K]] struct {
 	// SymbolStringer specifies how a symbol in a monomial is formated when the polynomial is printed out.
 	SymbolStringer func(s Symbol) string
 
+	field K
 	order Order
-	m     *omap.MapFunc[Monomial, *big.Rat]
-
-	// Buffers
-	r0 *big.Rat
+	m     *omap.MapFunc[Monomial, K]
 }
 
 // NewPolynomial returns a new polynomial containing the given terms.
-func NewPolynomial(order Order, terms ...PolynomialTerm) *Polynomial {
-	x := &Polynomial{
+func NewPolynomial[K Field[K]](field K, order Order, terms ...PolynomialTerm[K]) *Polynomial[K] {
+	x := &Polynomial[K]{
 		SymbolStringer: englishSymbolStringer,
+		field:          field,
 		order:          order,
-		m:              omap.NewMapFunc[Monomial, *big.Rat](order),
-		r0:             big.NewRat(0, 1),
+		m:              omap.NewMapFunc[Monomial, K](order),
 	}
 	for _, term := range terms {
-		if term.Coefficient == nil {
-			term.Coefficient = big.NewRat(1, 1)
-		}
 		x.addTerm(1, term)
 	}
 	return x
 }
 
+// Field returns the field of the coefficients in x.
+func (x *Polynomial[K]) Field() K { return x.field }
+
+// Order returns the monomial order employed by x.
+func (x *Polynomial[K]) Order() Order { return x.order }
+
+// Len reports the number of terms in x.
+func (x *Polynomial[K]) Len() int { return x.m.Len() }
+
 // Terms iterates the terms in a polynomial.
-func (x *Polynomial) Terms() iter.Seq2[*big.Rat, Monomial] {
-	return func(yield func(*big.Rat, Monomial) bool) {
+func (x *Polynomial[K]) Terms() iter.Seq2[K, Monomial] {
+	return func(yield func(K, Monomial) bool) {
 		for w, c := range x.m.Backward() {
 			if !yield(c, w) {
 				return
@@ -110,50 +182,43 @@ func (x *Polynomial) Terms() iter.Seq2[*big.Rat, Monomial] {
 	}
 }
 
-// Cmp compares two polynomials by first comparing their monomials consecutively in descending monomial order.
-// In the case of a tie, Cmp compares their coefficients again consecutively.
-func (x *Polynomial) Cmp(y *Polynomial) int {
-	// Compare monomials.
+// Equal reports whether x and y have the same coefficients and monomials.
+func (x *Polynomial[K]) Equal(y *Polynomial[K]) bool {
+	if x.m.Len() != y.m.Len() {
+		return false
+	}
 	for i := range x.m.Len() {
-		if i >= y.m.Len() {
-			return 1
+		xw, xc := x.m.At(x.m.Len() - 1 - i)
+		yw, yc := y.m.At(y.m.Len() - 1 - i)
+		if !monomialEq(xw, yw) {
+			return false
 		}
-		xw, _ := x.m.At(x.m.Len() - 1 - i)
-		yw, _ := y.m.At(y.m.Len() - 1 - i)
-		if wo := x.order(xw, yw); wo != 0 {
-			return wo
-		}
-	}
-	if x.m.Len() < y.m.Len() {
-		return -1
-	}
-
-	// Compare coefficients.
-	for i := range x.m.Len() {
-		_, xc := x.m.At(x.m.Len() - 1 - i)
-		_, yc := y.m.At(y.m.Len() - 1 - i)
-		if co := xc.Cmp(yc); co != 0 {
-			return co
+		if !xc.Equal(yc) {
+			return false
 		}
 	}
-	return 0
+	return true
 }
 
 // Set sets z to x and returns z.
-func (z *Polynomial) Set(x *Polynomial) *Polynomial {
+func (z *Polynomial[K]) Set(x *Polynomial[K]) *Polynomial[K] {
+	if z == x {
+		return z
+	}
 	z.SymbolStringer = x.SymbolStringer
+	z.field = x.field
 	z.order = x.order
-	z.m = omap.NewMapFunc[Monomial, *big.Rat](z.order)
+	z.m = omap.NewMapFunc[Monomial, K](z.order)
 	for xw, xc := range x.m.All() {
 		w := make(Monomial, len(xw))
 		copy(w, xw)
-		z.addTerm(1, PolynomialTerm{Coefficient: xc, Monomial: w})
+		z.addTerm(1, PolynomialTerm[K]{Coefficient: xc, Monomial: w})
 	}
 	return z
 }
 
 // Add sets z to the sum x+y and returns z.
-func (z *Polynomial) Add(x, y *Polynomial) *Polynomial {
+func (z *Polynomial[K]) Add(x, y *Polynomial[K]) *Polynomial[K] {
 	// Set z = x, while handling the case where x or y is z itself.
 	if y == z {
 		x, y = y, x
@@ -163,7 +228,7 @@ func (z *Polynomial) Add(x, y *Polynomial) *Polynomial {
 		for xw, c := range x.m.All() {
 			w := make(Monomial, len(xw))
 			copy(w, xw)
-			z.addTerm(1, PolynomialTerm{Coefficient: c, Monomial: w})
+			z.addTerm(1, PolynomialTerm[K]{Coefficient: c, Monomial: w})
 		}
 	}
 
@@ -171,14 +236,14 @@ func (z *Polynomial) Add(x, y *Polynomial) *Polynomial {
 	for yw, c := range y.m.All() {
 		w := make(Monomial, len(yw))
 		copy(w, yw)
-		z.addTerm(1, PolynomialTerm{Coefficient: c, Monomial: w})
+		z.addTerm(1, PolynomialTerm[K]{Coefficient: c, Monomial: w})
 	}
 
 	return z
 }
 
 // Mul sets z to the product x*y and returns z.
-func (z *Polynomial) Mul(x, y *Polynomial) *Polynomial {
+func (z *Polynomial[K]) Mul(x, y *Polynomial[K]) *Polynomial[K] {
 	if z == x {
 		panic(fmt.Sprintf("z == x"))
 	}
@@ -189,10 +254,10 @@ func (z *Polynomial) Mul(x, y *Polynomial) *Polynomial {
 	z.m.Clear()
 	for xw, xc := range x.m.Backward() {
 		for yw, yc := range y.m.Backward() {
-			c := z.r0.Mul(xc, yc)
+			c := z.field.Mul(xc, yc)
 			w := make(Monomial, 0, len(xw)+len(yw))
 			w = append(append(w, xw...), yw...)
-			z.addTerm(1, PolynomialTerm{Coefficient: c, Monomial: w})
+			z.addTerm(1, PolynomialTerm[K]{Coefficient: c, Monomial: w})
 		}
 	}
 
@@ -200,13 +265,13 @@ func (z *Polynomial) Mul(x, y *Polynomial) *Polynomial {
 }
 
 // Pow sets z to the power x^y and returns z.
-func (z *Polynomial) Pow(x *Polynomial, y int) *Polynomial {
+func (z *Polynomial[K]) Pow(x *Polynomial[K], y int) *Polynomial[K] {
 	if z == x {
 		panic("z == x")
 	}
 
 	z.Set(x)
-	buf := NewPolynomial(z.order)
+	buf := NewPolynomial[K](z.field, z.order)
 	for range y - 1 {
 		buf.Mul(z, x)
 		z, buf = buf, z
@@ -221,71 +286,83 @@ func (z *Polynomial) Pow(x *Polynomial, y int) *Polynomial {
 
 // LeadingTerm returns the polynomial term of the leading monomial.
 // Note that the leading term depends on the monomial order employed by the polynomial.
-func (x *Polynomial) LeadingTerm() PolynomialTerm {
+func (x *Polynomial[K]) LeadingTerm() PolynomialTerm[K] {
 	w, ok := x.m.Max()
 	if !ok {
-		return PolynomialTerm{}
+		panic("zero polynomial has no terms")
 	}
 	c, _ := x.m.Get(w)
-	return PolynomialTerm{Coefficient: c, Monomial: w}
+	return PolynomialTerm[K]{Coefficient: c, Monomial: w}
 }
 
 // String returns the string representation of x.
 // Symbols in x are formatted using x.SymbolStringer.
-func (x *Polynomial) String() string {
+func (x *Polynomial[K]) String() string {
+	if x.Len() == 0 {
+		return "0"
+	}
 	var b strings.Builder
-	var i int = -1
-	for w, c := range x.m.Backward() {
-		// Print c.
-		i++
-		switch {
-		case len(w) != 0 && c.Cmp(big.NewRat(1, 1)) == 0:
-			if i > 0 {
-				fmt.Fprintf(&b, "+")
-			}
-		case len(w) != 0 && c.Cmp(big.NewRat(-1, 1)) == 0:
-			fmt.Fprintf(&b, "-")
-		default:
-			if c.Sign() == 1 && i > 0 {
-				fmt.Fprintf(&b, "+")
-			}
-			fmt.Fprintf(&b, "%s", c.RatString())
-		}
+	for i := range x.m.Len() {
+		w, c := x.m.At(x.m.Len() - 1 - i)
 
+		// Print c.
+		s := c.String()
+		if s[0] != '-' {
+			s = "+" + s
+		}
+		switch {
+		case i == 0 && s == "+1" && len(w) != 0:
+			s = ""
+		case i == 0 && s[0] == '+':
+			s = s[1:]
+		case s == "+1" && len(w) != 0:
+			s = "+"
+		case s == "-1" && len(w) != 0:
+			s = "-"
+		}
+		fmt.Fprintf(&b, "%s", s)
+
+		// Print w.
 		printMonomial(&b, w, x.SymbolStringer)
 	}
 	return b.String()
 }
 
-func (x *Polynomial) addTerm(sign int, term PolynomialTerm) {
+func (x *Polynomial[K]) addTerm(sign int, term PolynomialTerm[K]) {
 	c, ok := x.m.Get(term.Monomial)
 	if !ok {
-		c = big.NewRat(0, 1)
+		c = x.field.NewZero()
 	}
 
+	tc := term.Coefficient
+	tcv := reflect.ValueOf(tc)
+	kind := tcv.Kind()
+	if (kind == reflect.Ptr || kind == reflect.Interface) && tcv.IsNil() {
+		tc = x.field.NewOne()
+	}
 	if sign < 0 {
-		c.Sub(c, term.Coefficient)
+		c.Sub(c, tc)
 	} else {
-		c.Add(c, term.Coefficient)
+		c.Add(c, tc)
 	}
 
-	if c.Sign() == 0 {
+	if c.Equal(x.field.NewZero()) {
 		x.m.Delete(term.Monomial)
 	} else {
 		x.m.Set(term.Monomial, c)
 	}
 }
 
-func (z *Polynomial) add(sign int, c *big.Rat, left Monomial, x *Polynomial, right Monomial) {
+func (z *Polynomial[K]) add(sign int, c K, left Monomial, x *Polynomial[K], right Monomial) {
 	for xw, xc := range x.m.Backward() {
-		c := z.r0.Mul(c, xc)
+		c := z.field.Mul(c, xc)
 		w := make(Monomial, 0, len(left)+len(xw)+len(right))
 		w = append(append(append(w, left...), xw...), right...)
-		z.addTerm(sign, PolynomialTerm{Coefficient: c, Monomial: w})
+		z.addTerm(sign, PolynomialTerm[K]{Coefficient: c, Monomial: w})
 	}
 }
 
-func (z *Polynomial) mulScalar(scalar *big.Rat, x *Polynomial) *Polynomial {
+func (z *Polynomial[K]) mulScalar(scalar K, x *Polynomial[K]) *Polynomial[K] {
 	if z == x {
 		for zw, zc := range z.m.All() {
 			zc.Mul(scalar, zc)
@@ -296,10 +373,10 @@ func (z *Polynomial) mulScalar(scalar *big.Rat, x *Polynomial) *Polynomial {
 
 	z.m.Clear()
 	for xw, xc := range x.m.All() {
-		c := z.r0.Mul(scalar, xc)
+		c := z.field.Mul(scalar, xc)
 		w := make(Monomial, len(xw))
 		copy(w, xw)
-		z.addTerm(1, PolynomialTerm{Coefficient: c, Monomial: w})
+		z.addTerm(1, PolynomialTerm[K]{Coefficient: c, Monomial: w})
 	}
 	return z
 }
@@ -312,32 +389,32 @@ func (z *Polynomial) mulScalar(scalar *big.Rat, x *Polynomial) *Polynomial {
 // For the exact form of a quotient, see Theorem 3.2.1, Xiu Xingqiang.
 //
 // Xiu, Xingqiang. "Non-commutative Gröbner bases and applications." PhD diss., Universität Passau, 2012.
-type Quotient struct {
+type Quotient[K Field[K]] struct {
 	// Coefficient is c_{ij} in Theorem 3.2.1, Xiu Xingqiang.
-	Coefficient *big.Rat
+	Coefficient K
 	// Coefficient is w_{ij} in Theorem 3.2.1, Xiu Xingqiang.
 	Left Monomial
 	// Coefficient is w'_{ij} in Theorem 3.2.1, Xiu Xingqiang.
 	Right Monomial
 }
 
-// Divide divides the polynomial f by the ideal g, and returns the remainder polynomial and quotient.
+// Divide divides the polynomial f by the ideal g, and returns the quotient and remainder.
 // The polynomial f is modified upon return.
 // For more details, please see Theorem 3.2.1, Xiu Xingqiang.
 //
 // Xiu, Xingqiang. "Non-commutative Gröbner bases and applications." PhD diss., Universität Passau, 2012.
-func Divide(quotient [][]Quotient, f *Polynomial, g []*Polynomial) (remainder *Polynomial, outQuotient [][]Quotient) {
+func Divide[K Field[K]](quotient [][]Quotient[K], f *Polynomial[K], g []*Polynomial[K]) (outQuotient [][]Quotient[K], remainder *Polynomial[K]) {
 	if quotient != nil {
 		short := len(g) - len(quotient)
 		if short > 0 {
-			quotient = append(quotient, make([][]Quotient, short)...)
+			quotient = append(quotient, make([][]Quotient[K], short)...)
 		}
 		quotient = quotient[:len(g)]
 		for i := range quotient {
 			quotient[i] = quotient[i][:0]
 		}
 	}
-	p := NewPolynomial(f.order)
+	p := NewPolynomial[K](f.field, f.order)
 	p.SymbolStringer = f.SymbolStringer
 	v := f
 
@@ -346,7 +423,7 @@ func Divide(quotient [][]Quotient, f *Polynomial, g []*Polynomial) (remainder *P
 		ltv := lmv.Monomial
 
 		// Find basis where ltv = left * ltg * right.
-		basis, leftEnd, lmg := -1, -1, PolynomialTerm{}
+		basis, leftEnd, lmg := -1, -1, PolynomialTerm[K]{}
 		for i, gi := range g {
 			if gi == nil {
 				continue
@@ -364,8 +441,8 @@ func Divide(quotient [][]Quotient, f *Polynomial, g []*Polynomial) (remainder *P
 			p.addTerm(1, lmv)
 			v.addTerm(-1, lmv)
 		} else {
-			q := Quotient{
-				Coefficient: big.NewRat(0, 1).Quo(lmv.Coefficient, lmg.Coefficient),
+			q := Quotient[K]{
+				Coefficient: f.field.NewZero().Div(lmv.Coefficient, lmg.Coefficient),
 				Left:        ltv[:leftEnd],
 				Right:       ltv[leftEnd+len(lmg.Monomial):],
 			}
@@ -376,7 +453,7 @@ func Divide(quotient [][]Quotient, f *Polynomial, g []*Polynomial) (remainder *P
 		}
 	}
 
-	return p, quotient
+	return quotient, p
 }
 
 // Buchberger returns the Gröbner basis of the ideal g, using the Buchberger algorithm.
@@ -385,14 +462,14 @@ func Divide(quotient [][]Quotient, f *Polynomial, g []*Polynomial) (remainder *P
 // For more details, please see Theorem 4.2.24, Xiu Xingqiang.
 //
 // Xiu, Xingqiang. "Non-commutative Gröbner bases and applications." PhD diss., Universität Passau, 2012.
-func Buchberger(g []*Polynomial, maxIter int) (basis []*Polynomial, complete bool) {
+func Buchberger[K Field[K]](g []*Polynomial[K], maxIter int) (basis []*Polynomial[K], complete bool) {
 	// Buffers.
-	r0 := big.NewRat(0, 1)
+	r0 := g[0].field.NewZero()
 	buf := &Monomial{}
 
 	g = interreduce(g)
 	// t tracks unwanted polynomials in g.
-	t := make([]*Polynomial, len(g))
+	t := make([]*Polynomial[K], len(g))
 	deleteUnwanted := func() {
 		for i := range t {
 			if t[i] != nil {
@@ -408,7 +485,7 @@ func Buchberger(g []*Polynomial, maxIter int) (basis []*Polynomial, complete boo
 		}
 	}
 	// b is the set of obstructions.
-	var b []obstruction
+	var b []obstruction[K]
 	for l := 1; l <= len(g); l++ {
 		gl := g[:l]
 		b = addObstructions(b, gl, buf)
@@ -428,9 +505,9 @@ func Buchberger(g []*Polynomial, maxIter int) (basis []*Polynomial, complete boo
 		b = b[:len(b)-1]
 
 		// Compute S-polynomial of oij.
-		s := sPolynomial(oij, g, r0)
+		s := sPolynomial[K](oij, g, r0)
 		deleteUnwanted()
-		sP, _ := Divide(nil, s, g)
+		_, sP := Divide(nil, s, g)
 		restoreUnwanted()
 		if sP.m.Len() == 0 {
 			continue
@@ -453,14 +530,14 @@ func Buchberger(g []*Polynomial, maxIter int) (basis []*Polynomial, complete boo
 
 	// Remove unwanted polynomials.
 	deleteUnwanted()
-	g = slices.DeleteFunc(g, func(gi *Polynomial) bool { return gi == nil })
+	g = slices.DeleteFunc(g, func(gi *Polynomial[K]) bool { return gi == nil })
 	g = interreduce(g)
 	// Make basis monic.
 	for i := range g {
 		lc := g[i].LeadingTerm().Coefficient
 		g[i].mulScalar(r0.Inv(lc), g[i])
 	}
-	slices.SortFunc(g, func(a, b *Polynomial) int { return a.Cmp(b) })
+	slices.SortFunc(g, polynomialCmp[K])
 	return g, complete
 }
 
@@ -471,7 +548,7 @@ func Buchberger(g []*Polynomial, maxIter int) (basis []*Polynomial, complete boo
 // Xiu, Xingqiang. "Non-commutative Gröbner bases and applications." PhD diss., Universität Passau, 2012.
 //
 // [homogeneous]: https://en.wikipedia.org/wiki/Homogeneous_polynomial
-func BuchbergerHomogeneous(g []*Polynomial, maxDeg int) (basis []*Polynomial, complete bool) {
+func BuchbergerHomogeneous[K Field[K]](g []*Polynomial[K], maxDeg int) (basis []*Polynomial[K], complete bool) {
 	// Check that g is a homogeneous ideal.
 	for _, f := range g {
 		if !homogeneous(f) {
@@ -480,19 +557,19 @@ func BuchbergerHomogeneous(g []*Polynomial, maxDeg int) (basis []*Polynomial, co
 	}
 
 	// Buffers.
-	r0 := big.NewRat(0, 1)
+	r0 := g[0].field.NewZero()
 	m0 := &Monomial{}
-	p0 := NewPolynomial(g[0].order)
+	p0 := NewPolynomial(g[0].field, g[0].order)
 
 	// Make a copy of g since we will be deleting from it.
-	newG := make([]*Polynomial, len(g))
+	newG := make([]*Polynomial[K], len(g))
 	copy(newG, g)
 	g = newG
 	// b is the set of obstructions.
-	var b []obstruction
+	var b []obstruction[K]
 	// gd and bd are subsets of g and b with degree d.
-	var gd []*Polynomial
-	var bd []obstruction
+	var gd []*Polynomial[K]
+	var bd []obstruction[K]
 	var numDeleted int
 
 	for {
@@ -511,7 +588,7 @@ func BuchbergerHomogeneous(g []*Polynomial, maxDeg int) (basis []*Polynomial, co
 		for len(gd) > 0 {
 			gL := gd[len(gd)-1]
 			gd = gd[:len(gd)-1]
-			gP, _ := Divide(nil, p0.Set(gL), basis)
+			_, gP := Divide(nil, p0.Set(gL), basis)
 			if gP.m.Len() == 0 {
 				continue
 			}
@@ -526,7 +603,7 @@ func BuchbergerHomogeneous(g []*Polynomial, maxDeg int) (basis []*Polynomial, co
 		for len(bd) > 0 {
 			o := bd[len(bd)-1]
 			bd = bd[:len(bd)-1]
-			sP, _ := Divide(nil, p0.Set(o.sPolynomial), basis)
+			_, sP := Divide(nil, p0.Set(o.sPolynomial), basis)
 			if sP.m.Len() == 0 {
 				continue
 			}
@@ -545,11 +622,11 @@ func BuchbergerHomogeneous(g []*Polynomial, maxDeg int) (basis []*Polynomial, co
 		lc := basis[i].LeadingTerm().Coefficient
 		basis[i].mulScalar(r0.Inv(lc), basis[i])
 	}
-	slices.SortFunc(basis, func(a, b *Polynomial) int { return a.Cmp(b) })
+	slices.SortFunc(basis, polynomialCmp[K])
 	return basis, complete
 }
 
-func interreduce(g []*Polynomial) []*Polynomial {
+func interreduce[K Field[K]](g []*Polynomial[K]) []*Polynomial[K] {
 	i, s := 0, len(g)
 	for i != s {
 		gi := g[i]
@@ -557,15 +634,15 @@ func interreduce(g []*Polynomial) []*Polynomial {
 			i++
 			continue
 		}
-		f := NewPolynomial(Deglex).Set(gi)
+		f := NewPolynomial(g[0].field, g[0].order).Set(gi)
 		g[i] = nil
-		giP, _ := Divide(nil, f, g)
+		_, giP := Divide(nil, f, g)
 
 		switch {
 		case giP.m.Len() == 0:
 			g[i] = nil
 			i++
-		case giP.Cmp(gi) != 0:
+		case !giP.Equal(gi):
 			g[i] = giP
 			i = 0
 		default:
@@ -573,10 +650,10 @@ func interreduce(g []*Polynomial) []*Polynomial {
 			i++
 		}
 	}
-	return slices.DeleteFunc(g, func(x *Polynomial) bool { return x == nil })
+	return slices.DeleteFunc(g, func(x *Polynomial[K]) bool { return x == nil })
 }
 
-func smallestDegreeSet(g, gd []*Polynomial, b, bd []obstruction, maxDeg int) ([]*Polynomial, []*Polynomial, []obstruction, []obstruction, bool) {
+func smallestDegreeSet[K Field[K]](g, gd []*Polynomial[K], b, bd []obstruction[K], maxDeg int) ([]*Polynomial[K], []*Polynomial[K], []obstruction[K], []obstruction[K], bool) {
 	// Compute the smallest degree.
 	var d int = math.MaxInt
 	for _, f := range g {
@@ -597,7 +674,7 @@ func smallestDegreeSet(g, gd []*Polynomial, b, bd []obstruction, maxDeg int) ([]
 			g[i] = nil
 		}
 	}
-	g = slices.DeleteFunc(g, func(f *Polynomial) bool { return f == nil })
+	g = slices.DeleteFunc(g, func(f *Polynomial[K]) bool { return f == nil })
 
 	//Extract from b.
 	bd = bd[:0]
@@ -607,58 +684,62 @@ func smallestDegreeSet(g, gd []*Polynomial, b, bd []obstruction, maxDeg int) ([]
 			b[i].sPolynomial = nil
 		}
 	}
-	b = slices.DeleteFunc(b, func(o obstruction) bool { return o.sPolynomial == nil })
+	b = slices.DeleteFunc(b, func(o obstruction[K]) bool { return o.sPolynomial == nil })
 
 	return g, gd, b, bd, true
 }
 
-func deleteHighDegObs(b []obstruction, basis []*Polynomial, maxDeg int, r0 *big.Rat) ([]obstruction, int) {
+func deleteHighDegObs[K Field[K]](b []obstruction[K], basis []*Polynomial[K], maxDeg int, r0 K) ([]obstruction[K], int) {
 	var numDeleted int
 	for i := len(b) - 1; i >= 0; i-- {
 		if b[i].sPolynomial != nil {
 			break
 		}
 		b[i].sPolynomial = sPolynomial(b[i], basis, r0)
+		if b[i].sPolynomial.Len() == 0 {
+			b[i].removed = true
+			continue
+		}
 		if len(b[i].sPolynomial.LeadingTerm().Monomial) > maxDeg {
 			b[i].removed = true
 			numDeleted++
 		}
 	}
-	b = slices.DeleteFunc(b, func(o obstruction) bool { return o.removed })
+	b = slices.DeleteFunc(b, func(o obstruction[K]) bool { return o.removed })
 	return b, numDeleted
 }
 
-type obstruction struct {
+type obstruction[K Field[K]] struct {
 	i           int
 	j           int
 	iLeft       Monomial
 	iRight      Monomial
 	jLeft       Monomial
 	jRight      Monomial
-	sPolynomial *Polynomial
+	sPolynomial *Polynomial[K]
 
 	removed bool
 }
 
-func sPolynomial(o obstruction, g []*Polynomial, buf *big.Rat) *Polynomial {
+func sPolynomial[K Field[K]](o obstruction[K], g []*Polynomial[K], buf K) *Polynomial[K] {
 	gi, gj := g[o.i], g[o.j]
 	lcgi := gi.LeadingTerm().Coefficient
 	lcgj := gj.LeadingTerm().Coefficient
-	s := NewPolynomial(gi.order)
+	s := NewPolynomial(gi.field, gi.order)
 	s.SymbolStringer = gi.SymbolStringer
 	s.add(1, buf.Inv(lcgi), o.iLeft, gi, o.iRight)
 	s.add(-1, buf.Inv(lcgj), o.jLeft, gj, o.jRight)
 	return s
 }
 
-func delRemoved(sPObs, obs []obstruction) ([]obstruction, []obstruction) {
+func delRemoved[K Field[K]](sPObs, obs []obstruction[K]) ([]obstruction[K], []obstruction[K]) {
 	spPrevLen := len(sPObs)
-	sPObs = slices.DeleteFunc(sPObs, func(o obstruction) bool { return o.removed })
+	sPObs = slices.DeleteFunc(sPObs, func(o obstruction[K]) bool { return o.removed })
 	obs = obs[:len(obs)-(spPrevLen-len(sPObs))]
 	return sPObs, obs
 }
 
-func addObstructions(obs []obstruction, g []*Polynomial, buf *Monomial) []obstruction {
+func addObstructions[K Field[K]](obs []obstruction[K], g []*Polynomial[K], buf *Monomial) []obstruction[K] {
 	// Add sPObs.
 	prevLen := len(obs)
 	obs = overlapObstruction(obs, g)
@@ -676,12 +757,12 @@ func addObstructions(obs []obstruction, g []*Polynomial, buf *Monomial) []obstru
 
 	// Remove from b using step 4d Theorem 4.2.22.
 	remove4d(b, sPObs, g, buf)
-	obs = slices.DeleteFunc(obs, func(o obstruction) bool { return o.removed })
+	obs = slices.DeleteFunc(obs, func(o obstruction[K]) bool { return o.removed })
 
 	return obs
 }
 
-func remove4b(sPObs []obstruction, order Order) {
+func remove4b[K Field[K]](sPObs []obstruction[K], order Order) {
 	for k := range sPObs {
 		oi := sPObs[k]
 		for l := range sPObs {
@@ -724,7 +805,7 @@ func remove4b(sPObs []obstruction, order Order) {
 	}
 }
 
-func remove4c(sPObs, b []obstruction, ltgs Monomial) {
+func remove4c[K Field[K]](sPObs, b []obstruction[K], ltgs Monomial) {
 	for k := range sPObs {
 		oj := sPObs[k]
 		for l := range b {
@@ -754,7 +835,7 @@ func remove4c(sPObs, b []obstruction, ltgs Monomial) {
 	}
 }
 
-func remove4d(b, sPObs []obstruction, g []*Polynomial, buf *Monomial) {
+func remove4d[K Field[K]](b, sPObs []obstruction[K], g []*Polynomial[K], buf *Monomial) {
 	sP := len(g) - 1
 	ltgs := g[sP].LeadingTerm().Monomial
 	for k := range b {
@@ -776,19 +857,19 @@ func remove4d(b, sPObs []obstruction, g []*Polynomial, buf *Monomial) {
 			wjwStart += (sEnd + 1)
 
 			// Check o(i, s).
-			ois := obstruction{i: oij.i, j: sP, iLeft: oij.iLeft, iRight: oij.iRight, jLeft: ws, jRight: wsP}
+			ois := obstruction[K]{i: oij.i, j: sP, iLeft: oij.iLeft, iRight: oij.iRight, jLeft: ws, jRight: wsP}
 			iNoOverlap := !hasOverlap(ois, ltgi, ltgs)
 			ois = shrink(ois)
-			iInS := slices.ContainsFunc(sPObs, func(o obstruction) bool { return obsEq(o, ois) })
+			iInS := slices.ContainsFunc(sPObs, func(o obstruction[K]) bool { return obsEq(o, ois) })
 			if !(iNoOverlap || iInS) {
 				continue
 			}
 
 			// Check o(j, s).
-			ojs := obstruction{i: oij.j, j: sP, iLeft: oij.jLeft, iRight: oij.jRight, jLeft: ws, jRight: wsP}
+			ojs := obstruction[K]{i: oij.j, j: sP, iLeft: oij.jLeft, iRight: oij.jRight, jLeft: ws, jRight: wsP}
 			jNoOverlap := !hasOverlap(ojs, ltgj, ltgs)
 			ojs = shrink(ojs)
-			jInS := slices.ContainsFunc(sPObs, func(o obstruction) bool { return obsEq(o, ojs) })
+			jInS := slices.ContainsFunc(sPObs, func(o obstruction[K]) bool { return obsEq(o, ojs) })
 			if !(jNoOverlap || jInS) {
 				continue
 			}
@@ -799,7 +880,7 @@ func remove4d(b, sPObs []obstruction, g []*Polynomial, buf *Monomial) {
 	}
 }
 
-func hasOverlap(o obstruction, im, jm Monomial) bool {
+func hasOverlap[K Field[K]](o obstruction[K], im, jm Monomial) bool {
 	if len(o.iLeft)+len(im) <= len(o.jLeft) {
 		return false
 	}
@@ -809,7 +890,7 @@ func hasOverlap(o obstruction, im, jm Monomial) bool {
 	return true
 }
 
-func shrink(o obstruction) obstruction {
+func shrink[K Field[K]](o obstruction[K]) obstruction[K] {
 	// Shrink left.
 	leftLen := min(len(o.iLeft), len(o.jLeft))
 	leftStart := leftLen
@@ -837,7 +918,7 @@ func shrink(o obstruction) obstruction {
 	return o
 }
 
-func overlapObstruction(obs []obstruction, g []*Polynomial) []obstruction {
+func overlapObstruction[K Field[K]](obs []obstruction[K], g []*Polynomial[K]) []obstruction[K] {
 	sP := len(g) - 1
 	for i := range sP {
 		obs = leftObstruction(obs, i, sP, g)
@@ -848,7 +929,7 @@ func overlapObstruction(obs []obstruction, g []*Polynomial) []obstruction {
 	return obs
 }
 
-func leftObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstruction {
+func leftObstruction[K Field[K]](obs []obstruction[K], i, j int, g []*Polynomial[K]) []obstruction[K] {
 	ltgi := g[i].LeadingTerm().Monomial
 	ltgj := g[j].LeadingTerm().Monomial
 	var iEnd, jStart int
@@ -865,7 +946,7 @@ func leftObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstruction
 		iOverlap := ltgi[:iEnd]
 		jOverlap := ltgj[jStart:]
 		if monomialEq(iOverlap, jOverlap) {
-			o := obstruction{i: i, j: j}
+			o := obstruction[K]{i: i, j: j}
 			o.iLeft = ltgj[:jStart]
 			o.jRight = ltgi[iEnd:]
 			obs = append(obs, o)
@@ -878,7 +959,7 @@ func leftObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstruction
 	return obs
 }
 
-func rightObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstruction {
+func rightObstruction[K Field[K]](obs []obstruction[K], i, j int, g []*Polynomial[K]) []obstruction[K] {
 	ltgi := g[i].LeadingTerm().Monomial
 	ltgj := g[j].LeadingTerm().Monomial
 	var iStart, jEnd int
@@ -895,7 +976,7 @@ func rightObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstructio
 		iOverlap := ltgi[iStart:]
 		jOverlap := ltgj[:jEnd]
 		if monomialEq(iOverlap, jOverlap) {
-			o := obstruction{i: i, j: j}
+			o := obstruction[K]{i: i, j: j}
 			o.iRight = ltgj[jEnd:]
 			o.jLeft = ltgi[:iStart]
 			obs = append(obs, o)
@@ -908,7 +989,7 @@ func rightObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstructio
 	return obs
 }
 
-func centerObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstruction {
+func centerObstruction[K Field[K]](obs []obstruction[K], i, j int, g []*Polynomial[K]) []obstruction[K] {
 	ltgi := g[i].LeadingTerm().Monomial
 	ltgj := g[j].LeadingTerm().Monomial
 
@@ -917,7 +998,7 @@ func centerObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstructi
 			jEnd := jStart + len(ltgi)
 			jOverlap := ltgj[jStart:jEnd]
 			if monomialEq(ltgi, jOverlap) {
-				o := obstruction{i: i, j: j}
+				o := obstruction[K]{i: i, j: j}
 				o.iLeft = ltgj[:jStart]
 				o.iRight = ltgj[jEnd:]
 				obs = append(obs, o)
@@ -928,7 +1009,7 @@ func centerObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstructi
 			iEnd := iStart + len(ltgj)
 			iOverlap := ltgi[iStart:iEnd]
 			if monomialEq(iOverlap, ltgj) {
-				o := obstruction{i: i, j: j}
+				o := obstruction[K]{i: i, j: j}
 				o.jLeft = ltgi[:iStart]
 				o.jRight = ltgi[iEnd:]
 				obs = append(obs, o)
@@ -939,7 +1020,7 @@ func centerObstruction(obs []obstruction, i, j int, g []*Polynomial) []obstructi
 	return obs
 }
 
-func homogeneous(x *Polynomial) bool {
+func homogeneous[K Field[K]](x *Polynomial[K]) bool {
 	for i := range x.m.Len() - 1 {
 		im, _ := x.m.At(i)
 		i1m, _ := x.m.At(i + 1)
@@ -1009,7 +1090,7 @@ func lexicographic(x, y Monomial) int {
 	return -1
 }
 
-func obsEq(x, y obstruction) bool {
+func obsEq[K Field[K]](x, y obstruction[K]) bool {
 	if x.i != y.i {
 		return false
 	}
@@ -1029,4 +1110,31 @@ func obsEq(x, y obstruction) bool {
 		return false
 	}
 	return true
+}
+
+func polynomialCmp[K Field[K]](x, y *Polynomial[K]) int {
+	// Compare monomials.
+	for i := range x.m.Len() {
+		if i >= y.m.Len() {
+			return 1
+		}
+		xw, _ := x.m.At(x.m.Len() - 1 - i)
+		yw, _ := y.m.At(y.m.Len() - 1 - i)
+		if wo := x.order(xw, yw); wo != 0 {
+			return wo
+		}
+	}
+	if x.m.Len() < y.m.Len() {
+		return -1
+	}
+
+	// Compare coefficients.
+	for i := range x.m.Len() {
+		_, xc := x.m.At(x.m.Len() - 1 - i)
+		_, yc := y.m.At(y.m.Len() - 1 - i)
+		if co := cmp.Compare(xc.String(), yc.String()); co != 0 {
+			return co
+		}
+	}
+	return 0
 }
