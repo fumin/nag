@@ -3,7 +3,6 @@ package nag
 import (
 	"bytes"
 	"fmt"
-	"math/big"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -13,7 +12,7 @@ import (
 )
 
 // Parse parses input and returns the polynomial it represents.
-func Parse(variables map[string]Symbol, order Order, input string) (*Polynomial, error) {
+func Parse(variables map[string]Symbol, order Order, input string) (*Polynomial[*Rat], error) {
 	n, err := parse.Parse(scan.NewScanner(bytes.NewBufferString(input)))
 	if err != nil {
 		return nil, errors.Wrap(err, "")
@@ -32,7 +31,7 @@ func Parse(variables map[string]Symbol, order Order, input string) (*Polynomial,
 	return p, nil
 }
 
-func evaluate(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial, error) {
+func evaluate(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial[*Rat], error) {
 	switch n.Token.Type {
 	case scan.Parenthesis:
 		return evaluateParenthesis(n, variables, order)
@@ -47,14 +46,14 @@ func evaluate(n *parse.Node, variables map[string]Symbol, order Order) (*Polynom
 	}
 }
 
-func evaluateParenthesis(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial, error) {
+func evaluateParenthesis(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial[*Rat], error) {
 	if n.Left == nil {
 		return nil, errors.Errorf("%#v", n)
 	}
 	return evaluate(n.Left, variables, order)
 }
 
-func evaluateOperator(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial, error) {
+func evaluateOperator(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial[*Rat], error) {
 	switch n.Token.Text {
 	case "+":
 		return evaluatePlus(n, variables, order)
@@ -71,44 +70,44 @@ func evaluateOperator(n *parse.Node, variables map[string]Symbol, order Order) (
 	}
 }
 
-func evaluateIdentifier(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial, error) {
+func evaluateIdentifier(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial[*Rat], error) {
 	s, ok := variables[n.Token.Text]
 	if !ok {
 		return nil, errors.Errorf("%#v", n)
 	}
-	p := NewPolynomial(order, PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{s}})
+	p := NewPolynomial(NewRat(0, 1), order, PolynomialTerm[*Rat]{Coefficient: NewRat(0, 1).NewOne(), Monomial: Monomial{s}})
 	return p, nil
 }
 
-func evaluatePlus(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial, error) {
+func evaluatePlus(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial[*Rat], error) {
 	left, right, err := evaluateLeftRight(n, variables, order)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("%#v", n))
 	}
-	z := NewPolynomial(order).Add(left, right)
+	z := NewPolynomial(NewRat(0, 1), order).Add(left, right)
 	return z, nil
 }
 
-func evaluateMinus(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial, error) {
+func evaluateMinus(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial[*Rat], error) {
 	left, right, err := evaluateLeftRight(n, variables, order)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("%#v", n))
 	}
-	negRight := right.mulScalar(big.NewRat(-1, 1), right)
-	z := NewPolynomial(order).Add(left, negRight)
+	negRight := right.mulScalar(NewRat(-1, 1), right)
+	z := NewPolynomial(NewRat(0, 1), order).Add(left, negRight)
 	return z, nil
 }
 
-func evaluateMultiply(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial, error) {
+func evaluateMultiply(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial[*Rat], error) {
 	left, right, err := evaluateLeftRight(n, variables, order)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("%#v", n))
 	}
-	z := NewPolynomial(order).Mul(left, right)
+	z := NewPolynomial(NewRat(0, 1), order).Mul(left, right)
 	return z, nil
 }
 
-func evaluateDivide(n *parse.Node, order Order) (*Polynomial, error) {
+func evaluateDivide(n *parse.Node, order Order) (*Polynomial[*Rat], error) {
 	if n.Left == nil {
 		return nil, errors.Errorf("%#v", n)
 	}
@@ -123,11 +122,11 @@ func evaluateDivide(n *parse.Node, order Order) (*Polynomial, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("%#v", n))
 	}
-	p := NewPolynomial(order, PolynomialTerm{Coefficient: big.NewRat(num, denom)})
+	p := NewPolynomial(NewRat(0, 1), order, PolynomialTerm[*Rat]{Coefficient: NewRat(num, denom)})
 	return p, nil
 }
 
-func evaluatePower(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial, error) {
+func evaluatePower(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial[*Rat], error) {
 	if n.Left == nil {
 		return nil, errors.Errorf("%#v", n)
 	}
@@ -139,20 +138,20 @@ func evaluatePower(n *parse.Node, variables map[string]Symbol, order Order) (*Po
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("%#v", n))
 	}
-	z := NewPolynomial(order).Pow(left, right)
+	z := NewPolynomial(NewRat(0, 1), order).Pow(left, right)
 	return z, nil
 }
 
-func evaluateInt(n *parse.Node, order Order) (*Polynomial, error) {
+func evaluateInt(n *parse.Node, order Order) (*Polynomial[*Rat], error) {
 	i, err := strconv.ParseInt(n.Token.Text, 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("%#v", n))
 	}
-	p := NewPolynomial(order, PolynomialTerm{Coefficient: big.NewRat(i, 1)})
+	p := NewPolynomial(NewRat(0, 1), order, PolynomialTerm[*Rat]{Coefficient: NewRat(i, 1)})
 	return p, nil
 }
 
-func evaluateLeftRight(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial, *Polynomial, error) {
+func evaluateLeftRight(n *parse.Node, variables map[string]Symbol, order Order) (*Polynomial[*Rat], *Polynomial[*Rat], error) {
 	if n.Left == nil {
 		return nil, nil, errors.Errorf("%#v", n)
 	}

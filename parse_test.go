@@ -2,7 +2,6 @@ package nag
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 )
 
@@ -11,15 +10,15 @@ func TestParse(t *testing.T) {
 		variables map[string]Symbol
 		order     Order
 		input     string
-		p         *Polynomial
+		p         *Polynomial[*Rat]
 	}{
 		{
 			variables: map[string]Symbol{"a": 1, "b": 2},
 			order:     Deglex,
 			input:     "ba^3",
 			p: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 1, 1}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 1, 1}},
 			),
 		},
 		{
@@ -27,8 +26,8 @@ func TestParse(t *testing.T) {
 			order:     Deglex,
 			input:     `-{b^{\dagger}}^1a^3`,
 			p: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 1, 1, 1}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 1, 1, 1}},
 			),
 		},
 		{
@@ -36,10 +35,10 @@ func TestParse(t *testing.T) {
 			order:     Deglex,
 			input:     "(-ba)^3a-a(3b-5b^2)",
 			p: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 1, 2, 1, 2, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-3, 1), Monomial: Monomial{1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(5, 1), Monomial: Monomial{1, 2, 2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 1, 2, 1, 2, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-3, 1), Monomial: Monomial{1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(5, 1), Monomial: Monomial{1, 2, 2}},
 			),
 		},
 		{
@@ -47,15 +46,15 @@ func TestParse(t *testing.T) {
 			order:     Deglex,
 			input:     "(a-b)^3",
 			p: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 2, 2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 2, 2}},
 			),
 		},
 		{
@@ -63,13 +62,13 @@ func TestParse(t *testing.T) {
 			order:     Deglex,
 			input:     "-12/5a^3((a+cc)b)^2a+7/3ca-3/2b",
 			p: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(-12, 5), Monomial: Monomial{1, 1, 1, 3, 3, 2, 3, 3, 2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-12, 5), Monomial: Monomial{1, 1, 1, 1, 2, 3, 3, 2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-12, 5), Monomial: Monomial{1, 1, 1, 3, 3, 2, 1, 2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-12, 5), Monomial: Monomial{1, 1, 1, 1, 2, 1, 2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(7, 3), Monomial: Monomial{3, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-3, 2), Monomial: Monomial{2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-12, 5), Monomial: Monomial{1, 1, 1, 3, 3, 2, 3, 3, 2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-12, 5), Monomial: Monomial{1, 1, 1, 1, 2, 3, 3, 2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-12, 5), Monomial: Monomial{1, 1, 1, 3, 3, 2, 1, 2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-12, 5), Monomial: Monomial{1, 1, 1, 1, 2, 1, 2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(7, 3), Monomial: Monomial{3, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-3, 2), Monomial: Monomial{2}},
 			),
 		},
 		{
@@ -77,12 +76,12 @@ func TestParse(t *testing.T) {
 			order:     Deglex,
 			input:     "5/3b(a+b)^2c+9a",
 			p: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(5, 3), Monomial: Monomial{2, 1, 1, 3}},
-				PolynomialTerm{Coefficient: big.NewRat(5, 3), Monomial: Monomial{2, 1, 2, 3}},
-				PolynomialTerm{Coefficient: big.NewRat(5, 3), Monomial: Monomial{2, 2, 1, 3}},
-				PolynomialTerm{Coefficient: big.NewRat(5, 3), Monomial: Monomial{2, 2, 2, 3}},
-				PolynomialTerm{Coefficient: big.NewRat(9, 1), Monomial: Monomial{1}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(5, 3), Monomial: Monomial{2, 1, 1, 3}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(5, 3), Monomial: Monomial{2, 1, 2, 3}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(5, 3), Monomial: Monomial{2, 2, 1, 3}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(5, 3), Monomial: Monomial{2, 2, 2, 3}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(9, 1), Monomial: Monomial{1}},
 			),
 		},
 	}
@@ -94,7 +93,7 @@ func TestParse(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%+v", err)
 			}
-			if p.Cmp(test.p) != 0 {
+			if !p.Equal(test.p) {
 				t.Errorf("%v %v", p, test.p)
 			}
 		})

@@ -13,27 +13,26 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/big"
 	"slices"
 	"testing"
 )
 
 func TestBuchbergerHomogeneous(t *testing.T) {
 	tests := []struct {
-		ideal    []*Polynomial
+		ideal    []*Polynomial[*Rat]
 		maxDeg   int
-		basis    []*Polynomial
+		basis    []*Polynomial[*Rat]
 		complete bool
 	}{
 		// Section 1.2.2 Commutative algebras, Bergman manual.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"x": 2, "y": 1}, Deglex, "x^2-y^2"),
 				parseMust(map[string]Symbol{"x": 2, "y": 1}, Deglex, "xy"),
 				parseMust(map[string]Symbol{"x": 2, "y": 1}, Deglex, "xy-yx"),
 			},
 			maxDeg: 4,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"x": 2, "y": 1}, Deglex, "yx"),
 				parseMust(map[string]Symbol{"x": 2, "y": 1}, Deglex, "xy"),
 				parseMust(map[string]Symbol{"x": 2, "y": 1}, Deglex, "x^2-y^2"),
@@ -43,12 +42,12 @@ func TestBuchbergerHomogeneous(t *testing.T) {
 		},
 		// Section 1.2.3 Non-commutative algebras, Bergman manual.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"x": 1, "y": 2}, Deglex, "x^2-y^2"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2}, Deglex, "xy"),
 			},
 			maxDeg: 4,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"x": 1, "y": 2}, Deglex, "xy"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2}, Deglex, "y^2-x^2"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2}, Deglex, "x^3"),
@@ -58,7 +57,7 @@ func TestBuchbergerHomogeneous(t *testing.T) {
 		},
 		// Section 2.4.3 Using eliminating ordering, Bergman manual.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"r": 4, "l": 3, "q": 2, "h": 1}, ElimOrder(), "r^2-q^2+lr-rh"),
 				parseMust(map[string]Symbol{"r": 4, "l": 3, "q": 2, "h": 1}, ElimOrder(), "rq-qr+lq-qh"),
 				parseMust(map[string]Symbol{"r": 4, "l": 3, "q": 2, "h": 1}, ElimOrder(), "lr-rl"),
@@ -69,7 +68,7 @@ func TestBuchbergerHomogeneous(t *testing.T) {
 				parseMust(map[string]Symbol{"r": 4, "l": 3, "q": 2, "h": 1}, ElimOrder(), "lh-hl"),
 			},
 			maxDeg: 10,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"r": 4, "l": 3, "q": 2, "h": 1}, ElimOrder(), "qh-hq"),
 				parseMust(map[string]Symbol{"r": 4, "l": 3, "q": 2, "h": 1}, ElimOrder(), "q^7-13h^2q^5+39h^4q^3-27h^6q"),
 				parseMust(map[string]Symbol{"r": 4, "l": 3, "q": 2, "h": 1}, ElimOrder(), "lh-hl"),
@@ -92,7 +91,7 @@ func TestBuchbergerHomogeneous(t *testing.T) {
 		},
 		// Section 2.5 Homogenisation, Bergman manual.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"x": 5, "y": 4, "z": 3, "t": 2, "f": 1}, ElimOrder(), "x^2-2f^2"),
 				parseMust(map[string]Symbol{"x": 5, "y": 4, "z": 3, "t": 2, "f": 1}, ElimOrder(), "y^2-3f^2"),
 				parseMust(map[string]Symbol{"x": 5, "y": 4, "z": 3, "t": 2, "f": 1}, ElimOrder(), "z^2-5f^2"),
@@ -110,7 +109,7 @@ func TestBuchbergerHomogeneous(t *testing.T) {
 				parseMust(map[string]Symbol{"x": 5, "y": 4, "z": 3, "t": 2, "f": 1}, ElimOrder(), "ft-tf"),
 			},
 			maxDeg: 11,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"x": 5, "y": 4, "z": 3, "t": 2, "f": 1}, ElimOrder(), "tf-ft"),
 				parseMust(map[string]Symbol{"x": 5, "y": 4, "z": 3, "t": 2, "f": 1}, ElimOrder(), "t^8-40f^2t^6+352f^4t^4-960f^6t^2+576f^8"),
 				parseMust(map[string]Symbol{"x": 5, "y": 4, "z": 3, "t": 2, "f": 1}, ElimOrder(), "zf-fz"),
@@ -134,14 +133,14 @@ func TestBuchbergerHomogeneous(t *testing.T) {
 		},
 		// braid3-9, Example 4.2, Kreuzer, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "yxy - zyz"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "xyx - zxy"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "zxz - yzx"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "x^3 + y^3 + z^3 + xyz"),
 			},
 			maxDeg: 9,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "zxy-xyx"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "zxz-yzx"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "zyz-yxy"),
@@ -327,14 +326,14 @@ func TestBuchbergerHomogeneous(t *testing.T) {
 		},
 		// braid4-9, Example 4.2, Kreuzer, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "yxy - zyz"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "xyz - zxy"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "zxz - yzx"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "x^3 + y^3 + z^3 + xyz"),
 			},
 			maxDeg: 9,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "zxy-xyz"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "zxz-yzx"),
 				parseMust(map[string]Symbol{"x": 1, "y": 2, "z": 3}, Deglex, "zyz-yxy"),
@@ -483,7 +482,7 @@ func TestBuchbergerHomogeneous(t *testing.T) {
 				t.Fatalf("%d %v", len(basis), basis)
 			}
 			for i := range basis {
-				if basis[i].Cmp(test.basis[i]) != 0 {
+				if !basis[i].Equal(test.basis[i]) {
 					t.Errorf("%d %v", i, basis[i])
 				}
 			}
@@ -496,354 +495,354 @@ func TestBuchbergerHomogeneous(t *testing.T) {
 
 func TestBuchberger(t *testing.T) {
 	tests := []struct {
-		ideal    []*Polynomial
+		ideal    []*Polynomial[*Rat]
 		maxiter  int
-		basis    []*Polynomial
+		basis    []*Polynomial[*Rat]
 		complete bool
 		long     bool
 	}{
 		// Example 5.12, Mora.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
-				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+				NewPolynomial[*Rat](
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 			},
 			maxiter: 10,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 			},
 			complete: true,
 		},
 		// Example 4.1.15, Xiu Xingqiang.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 5}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 5}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 5, 6, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 5, 6, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1}},
 				),
 			},
 			maxiter: 4,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 6, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 6, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 5, 6, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 5, 6, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 5}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 5}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 5, 6, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 5, 6, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1}},
 				),
 			},
 			complete: true,
 		},
 		// Section 6.5 Polynomials and Rules, NCAlgebra.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
 				),
 			},
 			maxiter: 13,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 			},
 			complete: true,
 		},
 		// Section 6.6 Polynomials and Rules, NCAlgebra.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-2, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-2, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-2, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-2, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1}},
 				),
 			},
 			maxiter: 20,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 2), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 2), Monomial: Monomial{1}},
 				),
 			},
 			complete: true,
 		},
 		// Section 1.2.3 Non-commutative algebras, Bergman manual.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2}},
 				),
 			},
 			maxiter: 9,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 1}},
 				),
 			},
 			complete: true,
 		},
 		// Section 6.9.1 Lex Order, NCAlgebra.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 3}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 4, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 2, 1, 1}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 3}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 4, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 2, 1, 1}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 3}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 3}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{}},
 				),
 			},
 			maxiter: 7,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 3}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 3}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2, 3, 3}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2, 3, 3}},
 				),
 			},
 			complete: true,
 		},
 		// Section 2.5 Homogenisation, Bergman manual.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 5}},
-					PolynomialTerm{Coefficient: big.NewRat(-2, 1), Monomial: Monomial{}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 5}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-2, 1), Monomial: Monomial{}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 4}},
-					PolynomialTerm{Coefficient: big.NewRat(-3, 1), Monomial: Monomial{}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 4}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-3, 1), Monomial: Monomial{}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 3}},
-					PolynomialTerm{Coefficient: big.NewRat(-5, 1), Monomial: Monomial{}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 3}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-5, 1), Monomial: Monomial{}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{5}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{4}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{3}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{5}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{4}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{3}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 4}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{4, 5}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 4}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{4, 5}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 3}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{3, 5}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 3}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{3, 5}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 5}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 5}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 3}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{3, 4}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 3}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{3, 4}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 4}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 4}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 3}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 3}},
 				),
 			},
 			maxiter: 28,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2, 2, 2, 2, 2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-40, 1), Monomial: Monomial{2, 2, 2, 2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(352, 1), Monomial: Monomial{2, 2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-960, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(576, 1), Monomial: Monomial{}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2, 2, 2, 2, 2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-40, 1), Monomial: Monomial{2, 2, 2, 2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(352, 1), Monomial: Monomial{2, 2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-960, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(576, 1), Monomial: Monomial{}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(576, 576), Monomial: Monomial{3}},
-					PolynomialTerm{Coefficient: big.NewRat(-5, 576), Monomial: Monomial{2, 2, 2, 2, 2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(194, 576), Monomial: Monomial{2, 2, 2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1520, 576), Monomial: Monomial{2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(2544, 576), Monomial: Monomial{2}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(576, 576), Monomial: Monomial{3}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-5, 576), Monomial: Monomial{2, 2, 2, 2, 2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(194, 576), Monomial: Monomial{2, 2, 2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1520, 576), Monomial: Monomial{2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(2544, 576), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(96, 96), Monomial: Monomial{4}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 96), Monomial: Monomial{2, 2, 2, 2, 2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-37, 96), Monomial: Monomial{2, 2, 2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(244, 96), Monomial: Monomial{2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-360, 96), Monomial: Monomial{2}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(96, 96), Monomial: Monomial{4}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 96), Monomial: Monomial{2, 2, 2, 2, 2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-37, 96), Monomial: Monomial{2, 2, 2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(244, 96), Monomial: Monomial{2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-360, 96), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					ElimOrder(),
-					PolynomialTerm{Coefficient: big.NewRat(576, 576), Monomial: Monomial{5}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 576), Monomial: Monomial{2, 2, 2, 2, 2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(28, 576), Monomial: Monomial{2, 2, 2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(56, 576), Monomial: Monomial{2, 2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-960, 576), Monomial: Monomial{2}},
+					NewRat(0, 1), ElimOrder(),
+					PolynomialTerm[*Rat]{Coefficient: NewRat(576, 576), Monomial: Monomial{5}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 576), Monomial: Monomial{2, 2, 2, 2, 2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(28, 576), Monomial: Monomial{2, 2, 2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(56, 576), Monomial: Monomial{2, 2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-960, 576), Monomial: Monomial{2}},
 				),
 			},
 			complete: true,
 		},
 		// G1, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(ababab^2ab^2)^2-1"),
 			},
 			maxiter: 689,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "ab^2ab^2abab-b^2ab^2ababa"),
@@ -884,13 +883,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G2, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(ababab^2)^3-1"),
 			},
 			maxiter: 2395,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "babab^2ababa-abab^2ab^2ab"),
@@ -993,13 +992,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G3, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(abab^2)^2-1"),
 			},
 			maxiter: 381,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "bab^2ab-a^2ba^2"),
@@ -1045,13 +1044,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G4, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(aba^2b^2)^2-1"),
 			},
 			maxiter: 342,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "ab^2a^2b-b^2aba^2"),
@@ -1085,13 +1084,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G5, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^5-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(abab^2)^2-1"),
 			},
 			maxiter: 183,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^5-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "bab^2ab-ab^3a"),
@@ -1118,13 +1117,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G6, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^5-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(ababab^4)^2-1"),
 			},
 			maxiter: 3095,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^5-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "bab^4abab-ab^4aba"),
@@ -1295,13 +1294,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G7, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^5-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(abab^2ab^4)^2-1"),
 			},
 			maxiter: 5323,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^5-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "bab^4abab-ab^4aba"),
@@ -1472,13 +1471,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G8, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^4-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(ababab^3)^2-1"),
 			},
 			maxiter: 309,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^4-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "bab^3abab-ab^3aba"),
@@ -1521,13 +1520,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G9, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(abab^2)^2-1"),
 			},
 			maxiter: 30,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "ab^2ab-b^2aba"),
@@ -1538,13 +1537,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G10, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(ababab^2)^2-1"),
 			},
 			maxiter: 115,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^2ab^2aba-ab^2abab"),
@@ -1565,13 +1564,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G11, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(abababab^2)^2-1"),
 			},
 			maxiter: 325,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "bab^2ababab-ab^2ab^2aba"),
@@ -1598,13 +1597,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G12, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(ababab^2abab^2)^2-1"),
 			},
 			maxiter: 1256,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^2ab^2abab^2aba-ab^2abab^2abab"),
@@ -1680,13 +1679,13 @@ func TestBuchberger(t *testing.T) {
 		},
 		// G13, Example 4.2.26 Xiu Xingqiang, expected basis from bergman.
 		{
-			ideal: []*Polynomial{
+			ideal: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "(ababababab^2ab^2)^2-1"),
 			},
 			maxiter: 7823,
-			basis: []*Polynomial{
+			basis: []*Polynomial[*Rat]{
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "a^2-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "b^3-1"),
 				parseMust(map[string]Symbol{"a": 2, "b": 1}, Deglex, "bab^2ab^2abababab-ab^2ab^2ab^2ababa"),
@@ -1893,7 +1892,7 @@ func TestBuchberger(t *testing.T) {
 			if testing.Short() && test.long {
 				t.Skip()
 			}
-			ideal := make([]*Polynomial, len(test.ideal))
+			ideal := make([]*Polynomial[*Rat], len(test.ideal))
 			copy(ideal, test.ideal)
 
 			basis, complete := Buchberger(ideal, test.maxiter)
@@ -1901,7 +1900,7 @@ func TestBuchberger(t *testing.T) {
 				t.Fatalf("%d %v", len(basis), basis)
 			}
 			for i := range basis {
-				if basis[i].Cmp(test.basis[i]) != 0 {
+				if !basis[i].Equal(test.basis[i]) {
 					t.Errorf("%d %v", i, basis[i])
 				}
 			}
@@ -1914,62 +1913,62 @@ func TestBuchberger(t *testing.T) {
 
 func TestAddObstructions(t *testing.T) {
 	tests := []struct {
-		b   []obstruction
-		g   []*Polynomial
-		obs []obstruction
+		b   []obstruction[*Rat]
+		g   []*Polynomial[*Rat]
+		obs []obstruction[*Rat]
 	}{
 		// OBS(2), Example 5.12, Mora.
 		{
-			b: []obstruction{
+			b: []obstruction[*Rat]{
 				{i: 0, j: 0, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1}},
 			},
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 			},
-			obs: []obstruction{
+			obs: []obstruction[*Rat]{
 				{i: 0, j: 1, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
 				{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{1}, jRight: Monomial{}},
 			},
 		},
 		// OBS(4), Example 5.12, Mora.
 		{
-			b: []obstruction{
+			b: []obstruction[*Rat]{
 				{i: 2, j: 2, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 1, j: 2, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2}},
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{2, 1}, jRight: Monomial{}},
 			},
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 			},
-			obs: []obstruction{
+			obs: []obstruction[*Rat]{
 				{i: 2, j: 2, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 0, j: 3, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{}},
 				{i: 1, j: 3, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
@@ -1978,39 +1977,39 @@ func TestAddObstructions(t *testing.T) {
 		},
 		// Example 4.15, Clemens Hofstadler.
 		{
-			b: []obstruction{
+			b: []obstruction[*Rat]{
 				{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1}},
 				{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{2}, jRight: Monomial{1}},
 				{i: 2, j: 3, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 2, j: 3, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{}, jRight: Monomial{}},
 			},
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(2, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(2, 1), Monomial: Monomial{1}},
 				),
 			},
-			obs: []obstruction{
+			obs: []obstruction[*Rat]{
 				{i: 2, j: 3, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 2, j: 3, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{}, jRight: Monomial{}},
 				{i: 0, j: 4, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{2, 2}, jRight: Monomial{}},
@@ -2022,7 +2021,7 @@ func TestAddObstructions(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			b := make([]obstruction, len(test.b))
+			b := make([]obstruction[*Rat], len(test.b))
 			copy(b, test.b)
 			buf := &Monomial{}
 			obs := addObstructions(b, test.g, buf)
@@ -2041,117 +2040,117 @@ func TestAddObstructions(t *testing.T) {
 
 func TestRemove4d(t *testing.T) {
 	tests := []struct {
-		b       []obstruction
-		sPObs   []obstruction
-		g       []*Polynomial
+		b       []obstruction[*Rat]
+		sPObs   []obstruction[*Rat]
+		g       []*Polynomial[*Rat]
 		removed []bool
 	}{
 		// OBS(2), Example 5.12, Mora.
 		{
-			b: []obstruction{
+			b: []obstruction[*Rat]{
 				{i: 0, j: 0, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1}},
 			},
-			sPObs: []obstruction{
+			sPObs: []obstruction[*Rat]{
 				{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{1}, jRight: Monomial{}},
 				{i: 0, j: 1, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
 			},
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 			},
 			removed: []bool{true},
 		},
 		// OBS(4), Example 5.12, Mora.
 		{
-			b: []obstruction{
+			b: []obstruction[*Rat]{
 				{i: 2, j: 2, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 1, j: 2, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2}},
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{2, 1}, jRight: Monomial{}},
 			},
-			sPObs: []obstruction{
+			sPObs: []obstruction[*Rat]{
 				{i: 0, j: 3, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{}},
 				{i: 1, j: 3, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 2, j: 3, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{2}, jRight: Monomial{}},
 			},
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 			},
 			removed: []bool{false, true, true},
 		},
 		// Example 3.13, Kreuzer.
 		{
-			b: []obstruction{
+			b: []obstruction[*Rat]{
 				{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{2, 1}},
 			},
-			sPObs: []obstruction{
+			sPObs: []obstruction[*Rat]{
 				{i: 0, j: 2, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1, 1, 1, 2}, jRight: Monomial{}},
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{}},
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
 			},
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1, 2, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1, 2, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1}},
 				),
 			},
 			removed: []bool{true},
 		},
 		{
-			b: []obstruction{
+			b: []obstruction[*Rat]{
 				{i: 0, j: 1, iLeft: Monomial{1}, iRight: Monomial{2, 1}, jLeft: Monomial{}, jRight: Monomial{}},
 			},
-			sPObs: []obstruction{
+			sPObs: []obstruction[*Rat]{
 				{i: 0, j: 2, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{}},
 				{i: 0, j: 2, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1, 1, 1, 2}, jRight: Monomial{}},
 			},
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1, 2, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1, 2, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1}},
 				),
 			},
 			removed: []bool{true},
@@ -2174,27 +2173,27 @@ func TestRemove4d(t *testing.T) {
 
 func TestRemove4c(t *testing.T) {
 	tests := []struct {
-		sPObs   []obstruction
-		b       []obstruction
+		sPObs   []obstruction[*Rat]
+		b       []obstruction[*Rat]
 		ltgs    Monomial
-		removed []obstruction
+		removed []obstruction[*Rat]
 	}{
 		// Example 3.10, Kreuzer.
 		{
-			sPObs: []obstruction{
+			sPObs: []obstruction[*Rat]{
 				{i: 1, j: 3, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{}, jRight: Monomial{}},
 				{i: 1, j: 3, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 2, j: 3, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 2, j: 3, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1, 2}},
 				{i: 3, j: 3, iLeft: Monomial{}, iRight: Monomial{2, 1}, jLeft: Monomial{1, 2}, jRight: Monomial{}},
 			},
-			b: []obstruction{
+			b: []obstruction[*Rat]{
 				{i: 1, j: 2, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{}},
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{}, jRight: Monomial{}},
 				{i: 2, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{1, 2}, jRight: Monomial{}},
 			},
 			ltgs: Monomial{1, 2, 1},
-			removed: []obstruction{
+			removed: []obstruction[*Rat]{
 				{i: 1, j: 3, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{}, jRight: Monomial{}},
 				{i: 1, j: 3, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 2, j: 3, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
@@ -2202,25 +2201,25 @@ func TestRemove4c(t *testing.T) {
 			},
 		},
 		{
-			sPObs: []obstruction{
+			sPObs: []obstruction[*Rat]{
 				{i: 2, j: 3, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{}, jRight: Monomial{}},
 			},
-			b: []obstruction{
+			b: []obstruction[*Rat]{
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{}, jRight: Monomial{}},
 			},
 			ltgs:    Monomial{1, 2, 1},
-			removed: []obstruction{},
+			removed: []obstruction[*Rat]{},
 		},
 	}
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			sPObs := make([]obstruction, len(test.sPObs))
+			sPObs := make([]obstruction[*Rat], len(test.sPObs))
 			copy(sPObs, test.sPObs)
 
 			remove4c(sPObs, test.b, test.ltgs)
-			sPObs = slices.DeleteFunc(sPObs, func(o obstruction) bool { return o.removed })
+			sPObs = slices.DeleteFunc(sPObs, func(o obstruction[*Rat]) bool { return o.removed })
 
 			if len(sPObs) != len(test.removed) {
 				t.Fatalf("%v", sPObs)
@@ -2236,26 +2235,26 @@ func TestRemove4c(t *testing.T) {
 
 func TestRemove4b(t *testing.T) {
 	tests := []struct {
-		obs     []obstruction
+		obs     []obstruction[*Rat]
 		order   Order
-		removed []obstruction
+		removed []obstruction[*Rat]
 	}{
 		// OBS(2) Example 5.10, Mora.
 		{
-			obs: []obstruction{
+			obs: []obstruction[*Rat]{
 				{i: 2, j: 2, iLeft: Monomial{2, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2}},
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{1}, jRight: Monomial{}},
 				{i: 1, j: 2, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
 			},
 			order: Deglex,
-			removed: []obstruction{
+			removed: []obstruction[*Rat]{
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{1}, jRight: Monomial{}},
 				{i: 1, j: 2, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
 			},
 		},
 		// OBS(4) Example 5.10, Mora.
 		{
-			obs: []obstruction{
+			obs: []obstruction[*Rat]{
 				{i: 1, j: 4, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{}},
 				{i: 1, j: 4, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1}},
 				{i: 2, j: 4, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
@@ -2263,7 +2262,7 @@ func TestRemove4b(t *testing.T) {
 				{i: 3, j: 4, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{2}, jRight: Monomial{}},
 			},
 			order: Deglex,
-			removed: []obstruction{
+			removed: []obstruction[*Rat]{
 				{i: 1, j: 4, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{}},
 				{i: 2, j: 4, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 3, j: 4, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{2}, jRight: Monomial{}},
@@ -2271,7 +2270,7 @@ func TestRemove4b(t *testing.T) {
 		},
 		// OBS(5) Example 5.10, Mora.
 		{
-			obs: []obstruction{
+			obs: []obstruction[*Rat]{
 				{i: 1, j: 5, iLeft: Monomial{1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
 				{i: 1, j: 5, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{1, 2}, jRight: Monomial{}},
 				{i: 2, j: 5, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2}},
@@ -2280,7 +2279,7 @@ func TestRemove4b(t *testing.T) {
 				{i: 4, j: 5, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
 			},
 			order: Deglex,
-			removed: []obstruction{
+			removed: []obstruction[*Rat]{
 				{i: 1, j: 5, iLeft: Monomial{1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
 				{i: 3, j: 5, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 				{i: 4, j: 5, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{2}, jRight: Monomial{}},
@@ -2288,23 +2287,23 @@ func TestRemove4b(t *testing.T) {
 		},
 		// Example 3.10, Kreuzer.
 		{
-			obs: []obstruction{
+			obs: []obstruction[*Rat]{
 				{i: 1, j: 2, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{}},
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{}, jRight: Monomial{}},
 				{i: 2, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{1, 2}, jRight: Monomial{}},
 			},
 			order: Deglex,
-			removed: []obstruction{
+			removed: []obstruction[*Rat]{
 				{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{}, jRight: Monomial{}},
 			},
 		},
 		{
-			obs: []obstruction{
+			obs: []obstruction[*Rat]{
 				{i: 1, j: 1, iLeft: Monomial{1, 2, 3}, iRight: Monomial{}, jLeft: Monomial{1, 2}, jRight: Monomial{2, 1}},
 				{i: 1, j: 1, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{1, 2}, jRight: Monomial{2, 1}},
 			},
 			order: Deglex,
-			removed: []obstruction{
+			removed: []obstruction[*Rat]{
 				{i: 1, j: 1, iLeft: Monomial{1, 2}, iRight: Monomial{}, jLeft: Monomial{1, 2}, jRight: Monomial{2, 1}},
 			},
 		},
@@ -2313,11 +2312,11 @@ func TestRemove4b(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			obs := make([]obstruction, len(test.obs))
+			obs := make([]obstruction[*Rat], len(test.obs))
 			copy(obs, test.obs)
 
 			remove4b(obs, test.order)
-			obs = slices.DeleteFunc(obs, func(o obstruction) bool { return o.removed })
+			obs = slices.DeleteFunc(obs, func(o obstruction[*Rat]) bool { return o.removed })
 
 			if len(obs) != len(test.removed) {
 				t.Fatalf("%v", obs)
@@ -2333,33 +2332,33 @@ func TestRemove4b(t *testing.T) {
 
 func TestShrink(t *testing.T) {
 	tests := []struct {
-		o      obstruction
-		shrunk obstruction
+		o      obstruction[*Rat]
+		shrunk obstruction[*Rat]
 	}{
 		// Example 4.2.3, Xiu Xingqiang.
 		{
-			o:      obstruction{i: 1, j: 2, iLeft: Monomial{1, 2, 1}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{1, 1, 2, 1, 2}},
-			shrunk: obstruction{i: 1, j: 2, iLeft: Monomial{2, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 1, 2, 1, 2}},
+			o:      obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{1, 2, 1}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{1, 1, 2, 1, 2}},
+			shrunk: obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{2, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 1, 2, 1, 2}},
 		},
 		// Example 3.5, Kreuzer.
 		{
-			o:      obstruction{i: 1, j: 2, iLeft: Monomial{1, 2, 1, 1}, iRight: Monomial{}, jLeft: Monomial{1, 2}, jRight: Monomial{2}},
-			shrunk: obstruction{i: 1, j: 2, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
+			o:      obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{1, 2, 1, 1}, iRight: Monomial{}, jLeft: Monomial{1, 2}, jRight: Monomial{2}},
+			shrunk: obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
 		},
 		{
-			o:      obstruction{i: 2, j: 3, iLeft: Monomial{2}, iRight: Monomial{2, 1, 2}, jLeft: Monomial{}, jRight: Monomial{1, 1, 1, 2}},
-			shrunk: obstruction{i: 2, j: 3, iLeft: Monomial{2}, iRight: Monomial{2}, jLeft: Monomial{}, jRight: Monomial{1, 1}},
+			o:      obstruction[*Rat]{i: 2, j: 3, iLeft: Monomial{2}, iRight: Monomial{2, 1, 2}, jLeft: Monomial{}, jRight: Monomial{1, 1, 1, 2}},
+			shrunk: obstruction[*Rat]{i: 2, j: 3, iLeft: Monomial{2}, iRight: Monomial{2}, jLeft: Monomial{}, jRight: Monomial{1, 1}},
 		},
 		{
-			o:      obstruction{i: 3, j: 4, iLeft: Monomial{2, 2, 1, 2}, iRight: Monomial{1, 1, 2}, jLeft: Monomial{2, 2, 2}, jRight: Monomial{2, 1, 2}},
-			shrunk: obstruction{i: 3, j: 4, iLeft: Monomial{1, 2}, iRight: Monomial{1}, jLeft: Monomial{2}, jRight: Monomial{2}},
+			o:      obstruction[*Rat]{i: 3, j: 4, iLeft: Monomial{2, 2, 1, 2}, iRight: Monomial{1, 1, 2}, jLeft: Monomial{2, 2, 2}, jRight: Monomial{2, 1, 2}},
+			shrunk: obstruction[*Rat]{i: 3, j: 4, iLeft: Monomial{1, 2}, iRight: Monomial{1}, jLeft: Monomial{2}, jRight: Monomial{2}},
 		},
 	}
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			o := obstruction{i: test.o.i, j: test.o.j, iLeft: make(Monomial, len(test.o.iLeft)), iRight: make(Monomial, len(test.o.iRight)), jLeft: make(Monomial, len(test.o.jLeft)), jRight: make(Monomial, len(test.o.jRight))}
+			o := obstruction[*Rat]{i: test.o.i, j: test.o.j, iLeft: make(Monomial, len(test.o.iLeft)), iRight: make(Monomial, len(test.o.iRight)), jLeft: make(Monomial, len(test.o.jLeft)), jRight: make(Monomial, len(test.o.jRight))}
 			copy(o.iLeft, test.o.iLeft)
 			copy(o.iRight, test.o.iRight)
 			copy(o.jLeft, test.o.jLeft)
@@ -2374,98 +2373,98 @@ func TestShrink(t *testing.T) {
 
 func TestHasOverlap(t *testing.T) {
 	tests := []struct {
-		obstruction obstruction
+		obstruction obstruction[*Rat]
 		im          Monomial
 		jm          Monomial
 		overlap     bool
 	}{
 		// Example 4.2.3, Xiu Xingqiang.
 		{
-			obstruction: obstruction{i: 1, j: 3, iLeft: Monomial{1, 2, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2}},
+			obstruction: obstruction[*Rat]{i: 1, j: 3, iLeft: Monomial{1, 2, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2}},
 			im:          Monomial{1, 2, 1, 2},
 			jm:          Monomial{1, 2, 1, 1, 2},
 			overlap:     true,
 		},
 		// Example 4.2.3, Xiu Xingqiang.
 		{
-			obstruction: obstruction{i: 1, j: 2, iLeft: Monomial{1, 2, 1}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{1, 1, 2, 1, 2}},
+			obstruction: obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{1, 2, 1}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{1, 1, 2, 1, 2}},
 			im:          Monomial{1, 2, 1, 2},
 			jm:          Monomial{2},
 			overlap:     false,
 		},
 		// Example 4.2.5, Xiu Xingqiang.
 		{
-			obstruction: obstruction{i: 2, j: 3, iLeft: Monomial{1, 2, 1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 2}},
+			obstruction: obstruction[*Rat]{i: 2, j: 3, iLeft: Monomial{1, 2, 1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 2}},
 			im:          Monomial{2, 2, 2},
 			jm:          Monomial{1, 2, 1, 1, 2},
 			overlap:     true,
 		},
 		// Example 4.2.5, Xiu Xingqiang.
 		{
-			obstruction: obstruction{i: 1, j: 2, iLeft: Monomial{1, 2}, iRight: Monomial{2}, jLeft: Monomial{1, 2, 1, 1}, jRight: Monomial{}},
+			obstruction: obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{1, 2}, iRight: Monomial{2}, jLeft: Monomial{1, 2, 1, 1}, jRight: Monomial{}},
 			im:          Monomial{1, 1, 2, 2},
 			jm:          Monomial{2, 2, 2},
 			overlap:     true,
 		},
 		// Case d, example 4.1.8, Xiu Xingqiang.
 		{
-			obstruction: obstruction{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{5, 6, 5, 6, 5, 6, 2}, jLeft: Monomial{4, 6, 5, 6, 5, 6, 5}, jRight: Monomial{}},
+			obstruction: obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{5, 6, 5, 6, 5, 6, 2}, jLeft: Monomial{4, 6, 5, 6, 5, 6, 5}, jRight: Monomial{}},
 			im:          Monomial{4, 6, 5, 6, 5, 6, 5},
 			jm:          Monomial{5, 6, 5, 6, 5, 6, 2},
 			overlap:     false,
 		},
 		// Case e, example 4.1.8, Xiu Xingqiang.
 		{
-			obstruction: obstruction{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{6, 5, 6, 5, 6, 5, 6, 2}, jLeft: Monomial{4, 6, 5, 6, 5, 6, 5, 6}, jRight: Monomial{}},
+			obstruction: obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{6, 5, 6, 5, 6, 5, 6, 2}, jLeft: Monomial{4, 6, 5, 6, 5, 6, 5, 6}, jRight: Monomial{}},
 			im:          Monomial{4, 6, 5, 6, 5, 6, 5},
 			jm:          Monomial{5, 6, 5, 6, 5, 6, 2},
 			overlap:     false,
 		},
 		// Case f, example 4.1.8, Xiu Xingqiang.
 		{
-			obstruction: obstruction{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{6, 5, 6, 5, 6, 5, 6, 5, 6, 2}, jLeft: Monomial{4, 6, 5, 6, 5, 6, 5, 6, 5, 6}, jRight: Monomial{}},
+			obstruction: obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{6, 5, 6, 5, 6, 5, 6, 5, 6, 2}, jLeft: Monomial{4, 6, 5, 6, 5, 6, 5, 6, 5, 6}, jRight: Monomial{}},
 			im:          Monomial{4, 6, 5, 6, 5, 6, 5},
 			jm:          Monomial{5, 6, 5, 6, 5, 6, 2},
 			overlap:     false,
 		},
 		// Case a, Example 2.9, Kreuzer.
 		{
-			obstruction: obstruction{i: 1, j: 1, iLeft: Monomial{}, iRight: Monomial{1, 1, 1}, jLeft: Monomial{1, 1, 1}, jRight: Monomial{}},
+			obstruction: obstruction[*Rat]{i: 1, j: 1, iLeft: Monomial{}, iRight: Monomial{1, 1, 1}, jLeft: Monomial{1, 1, 1}, jRight: Monomial{}},
 			im:          Monomial{1, 1},
 			jm:          Monomial{1, 1},
 			overlap:     false,
 		},
 		// Case a, Example 2.9, Kreuzer.
 		{
-			obstruction: obstruction{i: 1, j: 1, iLeft: Monomial{}, iRight: Monomial{2, 1, 1}, jLeft: Monomial{1, 1, 2}, jRight: Monomial{}},
+			obstruction: obstruction[*Rat]{i: 1, j: 1, iLeft: Monomial{}, iRight: Monomial{2, 1, 1}, jLeft: Monomial{1, 1, 2}, jRight: Monomial{}},
 			im:          Monomial{1, 1},
 			jm:          Monomial{1, 1},
 			overlap:     false,
 		},
 		// Case b, Example 2.9, Kreuzer.
 		{
-			obstruction: obstruction{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 1, 2}, jLeft: Monomial{1, 1, 1}, jRight: Monomial{}},
+			obstruction: obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 1, 2}, jLeft: Monomial{1, 1, 1}, jRight: Monomial{}},
 			im:          Monomial{1, 1},
 			jm:          Monomial{1, 2},
 			overlap:     false,
 		},
 		// Case b, Example 2.9, Kreuzer.
 		{
-			obstruction: obstruction{i: 1, j: 2, iLeft: Monomial{1, 2, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1, 1}},
+			obstruction: obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{1, 2, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1, 1}},
 			im:          Monomial{1, 1},
 			jm:          Monomial{1, 2},
 			overlap:     false,
 		},
 		// Case c, Example 2.9, Kreuzer.
 		{
-			obstruction: obstruction{i: 2, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 1, 2}, jLeft: Monomial{1, 2, 1}, jRight: Monomial{}},
+			obstruction: obstruction[*Rat]{i: 2, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 1, 2}, jLeft: Monomial{1, 2, 1}, jRight: Monomial{}},
 			im:          Monomial{1, 2},
 			jm:          Monomial{1, 2},
 			overlap:     false,
 		},
 		// Example 3.10, Kreuzer.
 		{
-			obstruction: obstruction{i: 1, j: 3, iLeft: Monomial{1, 2, 1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1, 2}},
+			obstruction: obstruction[*Rat]{i: 1, j: 3, iLeft: Monomial{1, 2, 1, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1, 2}},
 			im:          Monomial{1, 2},
 			jm:          Monomial{1, 2, 1},
 			overlap:     false,
@@ -2492,38 +2491,38 @@ func TestHasOverlap(t *testing.T) {
 }
 
 func TestObsExample4_1_15_XiuXingQiang(t *testing.T) {
-	g := []*Polynomial{
+	g := []*Polynomial[*Rat]{
 		NewPolynomial(
-			Deglex,
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 5}},
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 5}},
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4}},
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3}},
+			NewRat(0, 1), Deglex,
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 5}},
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 5}},
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4}},
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3}},
 		),
 		NewPolynomial(
-			Deglex,
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 5, 6, 2}},
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 2}},
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1}},
+			NewRat(0, 1), Deglex,
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 5, 6, 2}},
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 2}},
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1}},
 		),
 		NewPolynomial(
-			Deglex,
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 1}},
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 6, 2}},
+			NewRat(0, 1), Deglex,
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 1}},
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 6, 2}},
 		),
 		NewPolynomial(
-			Deglex,
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 1}},
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 2}},
+			NewRat(0, 1), Deglex,
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 1}},
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 2}},
 		),
 		NewPolynomial(
-			Deglex,
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 1}},
-			PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 5, 6, 2}},
+			NewRat(0, 1), Deglex,
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 1}},
+			PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 5, 6, 2}},
 		),
 	}
-	var obs []obstruction
+	var obs []obstruction[*Rat]
 	for l := 3; l <= len(g); l++ {
 		obs = overlapObstruction(obs, g[:l])
 	}
@@ -2534,126 +2533,126 @@ func TestObsExample4_1_15_XiuXingQiang(t *testing.T) {
 
 func TestIjObs(t *testing.T) {
 	tests := []struct {
-		g           []*Polynomial
-		obstruction []obstruction
+		g           []*Polynomial[*Rat]
+		obstruction []obstruction[*Rat]
 	}{
 		// Example 4.1.8, Xiu Xingqiang.
 		{
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 5}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 5}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{4}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4, 6, 5, 6, 5, 6, 5}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 6, 5, 6, 5}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{4}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 5, 6, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 5, 6, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{5, 6, 5, 6, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1}},
 				),
 			},
-			obstruction: []obstruction{
-				obstruction{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{6, 2}, jLeft: Monomial{4, 6}, jRight: Monomial{}},
-				obstruction{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{6, 5, 6, 2}, jLeft: Monomial{4, 6, 5, 6}, jRight: Monomial{}},
-				obstruction{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{6, 5, 6, 5, 6, 2}, jLeft: Monomial{4, 6, 5, 6, 5, 6}, jRight: Monomial{}},
+			obstruction: []obstruction[*Rat]{
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{6, 2}, jLeft: Monomial{4, 6}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{6, 5, 6, 2}, jLeft: Monomial{4, 6, 5, 6}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{6, 5, 6, 5, 6, 2}, jLeft: Monomial{4, 6, 5, 6, 5, 6}, jRight: Monomial{}},
 			},
 		},
 		// Example 5.10, Mora.
 		{
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 			},
-			obstruction: []obstruction{
-				obstruction{i: 0, j: 1, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
-				obstruction{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{1}, jRight: Monomial{}},
-				obstruction{i: 1, j: 2, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2}},
-				obstruction{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{2, 1}, jRight: Monomial{}},
-				obstruction{i: 0, j: 3, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1}},
-				obstruction{i: 0, j: 3, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{}},
-				obstruction{i: 1, j: 3, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
-				obstruction{i: 1, j: 3, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{2, 1}, jRight: Monomial{}},
-				obstruction{i: 2, j: 3, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{2}, jRight: Monomial{}},
-				obstruction{i: 0, j: 4, iLeft: Monomial{1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
-				obstruction{i: 0, j: 4, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{1, 2}, jRight: Monomial{}},
-				obstruction{i: 1, j: 4, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2}},
-				obstruction{i: 2, j: 4, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
-				obstruction{i: 3, j: 4, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
-				obstruction{i: 3, j: 4, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{2}, jRight: Monomial{}},
+			obstruction: []obstruction[*Rat]{
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{1}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2}},
+				obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{2, 1}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 0, j: 3, iLeft: Monomial{2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 1}},
+				obstruction[*Rat]{i: 0, j: 3, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 1, j: 3, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
+				obstruction[*Rat]{i: 1, j: 3, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{2, 1}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 2, j: 3, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{2}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 0, j: 4, iLeft: Monomial{1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
+				obstruction[*Rat]{i: 0, j: 4, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{1, 2}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 1, j: 4, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2}},
+				obstruction[*Rat]{i: 2, j: 4, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2}},
+				obstruction[*Rat]{i: 3, j: 4, iLeft: Monomial{1, 1}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1}},
+				obstruction[*Rat]{i: 3, j: 4, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{2}, jRight: Monomial{}},
 			},
 		},
 		// Example 2.6, Green.
 		{
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 3, 4, 1, 2, 3, 4}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2, 5, 6, 7, 4}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 3, 4, 1, 2, 3, 4}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2, 5, 6, 7, 4}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 4, 1, 2, 3, 4, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{5, 6, 7, 4, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 4, 1, 2, 3, 4, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{5, 6, 7, 4, 1}},
 				),
 			},
-			obstruction: []obstruction{
-				obstruction{i: 0, j: 1, iLeft: Monomial{3, 4}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 3, 4}},
-				obstruction{i: 0, j: 1, iLeft: Monomial{3, 4, 1, 2, 3, 4}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 3, 4, 1, 2, 3, 4}},
-				obstruction{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{1, 2}, jRight: Monomial{}},
-				obstruction{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{1, 2, 3, 4, 1}, jLeft: Monomial{1, 2, 3, 4, 1, 2}, jRight: Monomial{}},
+			obstruction: []obstruction[*Rat]{
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{3, 4}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 3, 4}},
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{3, 4, 1, 2, 3, 4}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{2, 3, 4, 1, 2, 3, 4}},
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{1}, jLeft: Monomial{1, 2}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{1, 2, 3, 4, 1}, jLeft: Monomial{1, 2, 3, 4, 1, 2}, jRight: Monomial{}},
 			},
 		},
 		{
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1, 2, 2, 1, 1, 2, 2, 1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1, 2, 2, 1, 1, 2, 2, 1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 2, 2, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 2, 2, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 1, 2, 2, 1, 1, 2, 2, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 1, 2, 2, 1, 1, 2, 2, 1}},
 				),
 			},
-			obstruction: []obstruction{
-				obstruction{i: 0, j: 1, iLeft: Monomial{1, 1, 2, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 1, 2, 2, 1, 1, 2, 2, 1, 2}},
-				obstruction{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{1, 2, 2, 1, 2}},
-				obstruction{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1, 1, 1, 2, 2}, jRight: Monomial{2}},
-				obstruction{i: 0, j: 2, iLeft: Monomial{2, 1, 1, 2, 2, 1, 1, 2, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 1, 2, 2, 1, 1, 2, 2, 1, 2}},
-				obstruction{i: 0, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 1, 2, 2, 1, 1, 2, 2, 1}, jLeft: Monomial{1, 1, 1, 2, 2, 1, 1, 2, 2, 1}, jRight: Monomial{}},
-				obstruction{i: 1, j: 2, iLeft: Monomial{2, 1, 1, 2, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{}},
-				obstruction{i: 1, j: 2, iLeft: Monomial{2, 1, 1, 2, 2, 1, 1, 2, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2, 2, 1}},
-				obstruction{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 2, 2, 1, 1, 2, 2, 1}, jLeft: Monomial{1, 1, 2}, jRight: Monomial{}},
-				obstruction{i: 1, j: 2, iLeft: Monomial{2}, iRight: Monomial{1, 2, 2, 1}, jLeft: Monomial{}, jRight: Monomial{}},
+			obstruction: []obstruction[*Rat]{
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{1, 1, 2, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 1, 2, 2, 1, 1, 2, 2, 1, 2}},
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1}, jRight: Monomial{1, 2, 2, 1, 2}},
+				obstruction[*Rat]{i: 0, j: 1, iLeft: Monomial{}, iRight: Monomial{}, jLeft: Monomial{1, 1, 1, 2, 2}, jRight: Monomial{2}},
+				obstruction[*Rat]{i: 0, j: 2, iLeft: Monomial{2, 1, 1, 2, 2, 1, 1, 2, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 1, 2, 2, 1, 1, 2, 2, 1, 2}},
+				obstruction[*Rat]{i: 0, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 1, 2, 2, 1, 1, 2, 2, 1}, jLeft: Monomial{1, 1, 1, 2, 2, 1, 1, 2, 2, 1}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{2, 1, 1, 2, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{2, 1, 1, 2, 2, 1, 1, 2, 2}, iRight: Monomial{}, jLeft: Monomial{}, jRight: Monomial{1, 2, 2, 1}},
+				obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{}, iRight: Monomial{1, 2, 2, 1, 1, 2, 2, 1}, jLeft: Monomial{1, 1, 2}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 1, j: 2, iLeft: Monomial{2}, iRight: Monomial{1, 2, 2, 1}, jLeft: Monomial{}, jRight: Monomial{}},
 			},
 		},
 	}
@@ -2661,7 +2660,7 @@ func TestIjObs(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			var obs []obstruction
+			var obs []obstruction[*Rat]
 			for j := range test.g {
 				for i := range j {
 					obs = leftObstruction(obs, i, j, test.g)
@@ -2697,61 +2696,61 @@ func TestIjObs(t *testing.T) {
 
 func TestIiObs(t *testing.T) {
 	tests := []struct {
-		g           []*Polynomial
-		obstruction []obstruction
+		g           []*Polynomial[*Rat]
+		obstruction []obstruction[*Rat]
 	}{
 		// Example 5.10, Mora.
 		{
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 			},
-			obstruction: []obstruction{
-				obstruction{i: 0, j: 0, iLeft: Monomial{}, iRight: Monomial{2, 1}, jLeft: Monomial{1, 2}, jRight: Monomial{}},
-				obstruction{i: 1, j: 1, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{2, 1}, jRight: Monomial{}},
-				obstruction{i: 2, j: 2, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{2}, jRight: Monomial{}},
+			obstruction: []obstruction[*Rat]{
+				obstruction[*Rat]{i: 0, j: 0, iLeft: Monomial{}, iRight: Monomial{2, 1}, jLeft: Monomial{1, 2}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 1, j: 1, iLeft: Monomial{}, iRight: Monomial{1, 2}, jLeft: Monomial{2, 1}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 2, j: 2, iLeft: Monomial{}, iRight: Monomial{2}, jLeft: Monomial{2}, jRight: Monomial{}},
 			},
 		},
 		// Example 2.6, Green.
 		{
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 3, 4, 1, 2, 3, 4}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2, 5, 6, 7, 4}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 3, 4, 1, 2, 3, 4}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2, 5, 6, 7, 4}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 4, 1, 2, 3, 4, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{5, 6, 7, 4, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 4, 1, 2, 3, 4, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{5, 6, 7, 4, 1}},
 				),
 			},
-			obstruction: []obstruction{
-				obstruction{i: 0, j: 0, iLeft: Monomial{}, iRight: Monomial{1, 2, 3, 4}, jLeft: Monomial{1, 2, 3, 4}, jRight: Monomial{}},
-				obstruction{i: 1, j: 1, iLeft: Monomial{}, iRight: Monomial{2, 3, 4, 1}, jLeft: Monomial{3, 4, 1, 2}, jRight: Monomial{}},
+			obstruction: []obstruction[*Rat]{
+				obstruction[*Rat]{i: 0, j: 0, iLeft: Monomial{}, iRight: Monomial{1, 2, 3, 4}, jLeft: Monomial{1, 2, 3, 4}, jRight: Monomial{}},
+				obstruction[*Rat]{i: 1, j: 1, iLeft: Monomial{}, iRight: Monomial{2, 3, 4, 1}, jLeft: Monomial{3, 4, 1, 2}, jRight: Monomial{}},
 			},
 		},
 	}
@@ -2759,7 +2758,7 @@ func TestIiObs(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			var obs []obstruction
+			var obs []obstruction[*Rat]
 			for i := range test.g {
 				obs = rightObstruction(obs, i, i, test.g)
 			}
@@ -2791,39 +2790,39 @@ func TestIiObs(t *testing.T) {
 
 func TestInterreduce(t *testing.T) {
 	tests := []struct {
-		g       []*Polynomial
-		reduced []*Polynomial
+		g       []*Polynomial[*Rat]
+		reduced []*Polynomial[*Rat]
 	}{
 		{
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-2, 1)},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-2, 1)},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(3, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-4, 1)},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(3, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-4, 1)},
 				),
 			},
-			reduced: []*Polynomial{
+			reduced: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(2, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-2, 1)},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(2, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-2, 1)},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1)},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1)},
 				),
 			},
 		},
@@ -2832,9 +2831,9 @@ func TestInterreduce(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			testg := make([]*Polynomial, 0, len(test.g))
+			testg := make([]*Polynomial[*Rat], 0, len(test.g))
 			for _, gi := range test.g {
-				testg = append(testg, NewPolynomial(Deglex).Set(gi))
+				testg = append(testg, NewPolynomial(NewRat(0, 1), Deglex).Set(gi))
 			}
 			reduced := interreduce(testg)
 
@@ -2842,7 +2841,7 @@ func TestInterreduce(t *testing.T) {
 				t.Errorf("%v", reduced)
 			}
 			for j := range reduced {
-				if reduced[j].Cmp(test.reduced[j]) != 0 {
+				if !reduced[j].Equal(test.reduced[j]) {
 					t.Errorf("%d %v %v", j, reduced[j], test.reduced[j])
 				}
 			}
@@ -2852,147 +2851,147 @@ func TestInterreduce(t *testing.T) {
 
 func TestDivide(t *testing.T) {
 	tests := []struct {
-		f         *Polynomial
-		g         []*Polynomial
-		quotient  [][]Quotient
-		remainder *Polynomial
+		f         *Polynomial[*Rat]
+		g         []*Polynomial[*Rat]
+		quotient  [][]Quotient[*Rat]
+		remainder *Polynomial[*Rat]
 	}{
 		// Example 3.2.2, Xiu Xingqiang.
 		{
 			f: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 3, 3, 2, 3}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 3, 3, 2, 3}},
 			),
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 3}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 3}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 1}},
 				),
 			},
 			remainder: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 3, 1, 3}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 3, 1, 3}},
 			),
 		},
 		// Example 3.2.5, Xiu Xingqiang.
 		{
 			f: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 3, 3, 2, 3}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 3, 3, 2, 3}},
 			),
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 3}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 3}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 1}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3}},
 				),
 			},
 			remainder: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 3, 1, 2, 3}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 3, 1, 2, 3}},
 			),
 		},
 		// Example 1.4, Mora.
 		{
 			f: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(2, 1), Monomial: Monomial{3, 2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-3, 1), Monomial: Monomial{1, 3, 3}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(2, 1), Monomial: Monomial{3, 2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-3, 1), Monomial: Monomial{1, 3, 3}},
 			),
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 3}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 3}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{3, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 3}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{3, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 3}},
 				),
 			},
 			remainder: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(-3, 1), Monomial: Monomial{1, 3, 3}},
-				PolynomialTerm{Coefficient: big.NewRat(2, 1), Monomial: Monomial{1, 2, 3}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-3, 1), Monomial: Monomial{1, 3, 3}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(2, 1), Monomial: Monomial{1, 2, 3}},
 			),
 		},
 		// Section 6.4 Simplifying Polynomial Expressions, NCAlgebra.
 		{
 			f: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 1, 2, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 1, 2, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
 			),
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2, 2}},
 				),
 			},
 			remainder: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
 			),
 		},
 		// Section 6.5 Poynomials and Rules, NCAlgebra.
 		{
 			f: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 2, 2, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 2, 2, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 1}},
 			),
-			g: []*Polynomial{
+			g: []*Polynomial[*Rat]{
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1}},
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 				),
 				NewPolynomial(
-					Deglex,
-					PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
-					PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1}},
+					NewRat(0, 1), Deglex,
+					PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
+					PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1}},
 				),
 			},
 			remainder: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2}},
 			),
 		},
 	}
@@ -3000,73 +2999,29 @@ func TestDivide(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			var remainder *Polynomial
-			quotient := [][]Quotient{}
-			testf := NewPolynomial(Deglex).Set(test.f)
-			remainder, quotient = Divide(quotient, testf, test.g)
+			var remainder *Polynomial[*Rat]
+			quotient := [][]Quotient[*Rat]{}
+			testf := NewPolynomial(NewRat(0, 1), Deglex).Set(test.f)
+			quotient, remainder = Divide(quotient, testf, test.g)
 
-			if remainder.Cmp(test.remainder) != 0 {
+			if !remainder.Equal(test.remainder) {
 				t.Errorf("%v", remainder)
 			}
 
 			// Check if quotient * g + remainder == f.
-			f := NewPolynomial(test.f.order)
+			f := NewPolynomial(test.f.field, test.f.order)
 			for i := range quotient {
 				for j := range quotient[i] {
-					c := NewPolynomial(Deglex, PolynomialTerm{Coefficient: quotient[i][j].Coefficient})
-					left := NewPolynomial(Deglex, PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: quotient[i][j].Left})
-					right := NewPolynomial(Deglex, PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: quotient[i][j].Right})
+					c := NewPolynomial(NewRat(0, 1), Deglex, PolynomialTerm[*Rat]{Coefficient: quotient[i][j].Coefficient})
+					left := NewPolynomial(NewRat(0, 1), Deglex, PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: quotient[i][j].Left})
+					right := NewPolynomial(NewRat(0, 1), Deglex, PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: quotient[i][j].Right})
 					cwgw := mul(c, left, test.g[i], right)
 					f.Add(f, cwgw)
 				}
 			}
 			f.Add(f, remainder)
-			if f.Cmp(test.f) != 0 {
+			if !f.Equal(test.f) {
 				t.Errorf("%v", f)
-			}
-		})
-	}
-}
-
-func TestPolynomialCmp(t *testing.T) {
-	tests := []struct {
-		x *Polynomial
-		y *Polynomial
-		c int
-	}{
-		{
-			x: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
-			),
-			y: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2}},
-			),
-			c: 1,
-		},
-		{
-			x: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(9, 1), Monomial: Monomial{2}},
-				PolynomialTerm{Coefficient: big.NewRat(7, 1), Monomial: Monomial{}},
-			),
-			y: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(3, 1), Monomial: Monomial{1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(2, 1), Monomial: Monomial{2, 1}},
-			),
-			c: -1,
-		},
-	}
-
-	for i, test := range tests {
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			t.Parallel()
-			if c := test.x.Cmp(test.y); c != test.c {
-				t.Errorf("%d", c)
 			}
 		})
 	}
@@ -3074,18 +3029,18 @@ func TestPolynomialCmp(t *testing.T) {
 
 func TestLeadingTerm(t *testing.T) {
 	tests := []struct {
-		x           *Polynomial
-		leadingTerm PolynomialTerm
+		x           *Polynomial[*Rat]
+		leadingTerm PolynomialTerm[*Rat]
 	}{
 		{
 			x: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 2), Monomial: Monomial{1}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 3), Monomial: Monomial{2}},
-				PolynomialTerm{Coefficient: big.NewRat(1, -4), Monomial: Monomial{1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(1, -5), Monomial: Monomial{1, 1}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 2), Monomial: Monomial{1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 3), Monomial: Monomial{2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, -4), Monomial: Monomial{1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, -5), Monomial: Monomial{1, 1}},
 			),
-			leadingTerm: PolynomialTerm{Coefficient: big.NewRat(-1, 4), Monomial: Monomial{1, 2}},
+			leadingTerm: PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 4), Monomial: Monomial{1, 2}},
 		},
 	}
 
@@ -3102,31 +3057,31 @@ func TestLeadingTerm(t *testing.T) {
 
 func TestPolynomialAdd(t *testing.T) {
 	type testcase struct {
-		x *Polynomial
-		y *Polynomial
-		z *Polynomial
+		x *Polynomial[*Rat]
+		y *Polynomial[*Rat]
+		z *Polynomial[*Rat]
 	}
 	tests := []testcase{
 		{
 			x: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(3, 1), Monomial: Monomial{1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(4, 1), Monomial: Monomial{2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(0, 1), Monomial: Monomial{2, 2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(3, 1), Monomial: Monomial{1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(4, 1), Monomial: Monomial{2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(0, 1), Monomial: Monomial{2, 2}},
 			),
 			y: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(-3, 1), Monomial: Monomial{1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(-7, 1), Monomial: Monomial{2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-3, 1), Monomial: Monomial{1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-7, 1), Monomial: Monomial{2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 2}},
 			),
 			z: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(2, 1), Monomial: Monomial{1, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-3, 1), Monomial: Monomial{2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(2, 1), Monomial: Monomial{1, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-3, 1), Monomial: Monomial{2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 2}},
 			),
 		},
 	}
@@ -3134,25 +3089,25 @@ func TestPolynomialAdd(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			z := NewPolynomial(test.z.order)
+			z := NewPolynomial(test.z.field, test.z.order)
 			z.Add(test.x, test.y)
-			if z.Cmp(test.z) != 0 {
+			if !z.Equal(test.z) {
 				t.Errorf("%v", z)
 			}
 
 			// z = x.
-			x := NewPolynomial(Deglex).Set(test.x)
+			x := NewPolynomial(NewRat(0, 1), Deglex).Set(test.x)
 			z = x
 			z.Add(x, test.y)
-			if z.Cmp(test.z) != 0 {
+			if !z.Equal(test.z) {
 				t.Errorf("%v", z)
 			}
 
 			// z = y.
-			y := NewPolynomial(Deglex).Set(test.y)
+			y := NewPolynomial(NewRat(0, 1), Deglex).Set(test.y)
 			z = y
 			z.Add(test.x, y)
-			if z.Cmp(test.z) != 0 {
+			if !z.Equal(test.z) {
 				t.Errorf("%v", z)
 			}
 		})
@@ -3161,19 +3116,19 @@ func TestPolynomialAdd(t *testing.T) {
 
 func TestPolynomialAddZEqXY(t *testing.T) {
 	tests := []struct {
-		x *Polynomial
-		z *Polynomial
+		x *Polynomial[*Rat]
+		z *Polynomial[*Rat]
 	}{
 		{
 			x: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(2, 1), Monomial: Monomial{1, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-3, 1), Monomial: Monomial{1, 2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(2, 1), Monomial: Monomial{1, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-3, 1), Monomial: Monomial{1, 2}},
 			),
 			z: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(4, 1), Monomial: Monomial{1, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-6, 1), Monomial: Monomial{1, 2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(4, 1), Monomial: Monomial{1, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-6, 1), Monomial: Monomial{1, 2}},
 			),
 		},
 	}
@@ -3181,10 +3136,10 @@ func TestPolynomialAddZEqXY(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			x := NewPolynomial(Deglex).Set(test.x)
+			x := NewPolynomial(NewRat(0, 1), Deglex).Set(test.x)
 			z := x
 			z.Add(x, x)
-			if z.Cmp(test.z) != 0 {
+			if !z.Equal(test.z) {
 				t.Errorf("%v", z)
 			}
 		})
@@ -3193,46 +3148,46 @@ func TestPolynomialAddZEqXY(t *testing.T) {
 
 func TestPolynomialMul(t *testing.T) {
 	tests := []struct {
-		x *Polynomial
-		y *Polynomial
-		z *Polynomial
+		x *Polynomial[*Rat]
+		y *Polynomial[*Rat]
+		z *Polynomial[*Rat]
 	}{
 		{
 			x: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(2, 1), Monomial: Monomial{1}},
-				PolynomialTerm{Coefficient: big.NewRat(3, 1), Monomial: Monomial{2}},
-				PolynomialTerm{Coefficient: big.NewRat(-4, 1), Monomial: Monomial{1, 2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(2, 1), Monomial: Monomial{1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(3, 1), Monomial: Monomial{2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-4, 1), Monomial: Monomial{1, 2}},
 			),
 			y: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(5, 2), Monomial: Monomial{1}},
-				PolynomialTerm{Coefficient: big.NewRat(-6, 1), Monomial: Monomial{2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(5, 2), Monomial: Monomial{1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-6, 1), Monomial: Monomial{2}},
 			),
 			z: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(5, 1), Monomial: Monomial{1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-12, 1), Monomial: Monomial{1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(15, 2), Monomial: Monomial{2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-18, 1), Monomial: Monomial{2, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(-10, 1), Monomial: Monomial{1, 2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(24, 1), Monomial: Monomial{1, 2, 2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(5, 1), Monomial: Monomial{1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-12, 1), Monomial: Monomial{1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(15, 2), Monomial: Monomial{2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-18, 1), Monomial: Monomial{2, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-10, 1), Monomial: Monomial{1, 2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(24, 1), Monomial: Monomial{1, 2, 2}},
 			),
 		},
 		{
 			x: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(3, 1), Monomial: Monomial{1}},
-				PolynomialTerm{Coefficient: big.NewRat(-4, 1), Monomial: Monomial{2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(3, 1), Monomial: Monomial{1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-4, 1), Monomial: Monomial{2}},
 			),
 			y: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(-2, 1)},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-2, 1)},
 			),
 			z: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(-6, 1), Monomial: Monomial{1}},
-				PolynomialTerm{Coefficient: big.NewRat(8, 1), Monomial: Monomial{2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-6, 1), Monomial: Monomial{1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(8, 1), Monomial: Monomial{2}},
 			),
 		},
 	}
@@ -3240,8 +3195,8 @@ func TestPolynomialMul(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			z := NewPolynomial(test.z.order).Mul(test.x, test.y)
-			if z.Cmp(test.z) != 0 {
+			z := NewPolynomial(test.z.field, test.z.order).Mul(test.x, test.y)
+			if !z.Equal(test.z) {
 				t.Errorf("%v", z)
 			}
 		})
@@ -3250,42 +3205,42 @@ func TestPolynomialMul(t *testing.T) {
 
 func TestPow(t *testing.T) {
 	tests := []struct {
-		x *Polynomial
+		x *Polynomial[*Rat]
 		y int
-		z *Polynomial
+		z *Polynomial[*Rat]
 	}{
 		{
 			x: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1}},
-				PolynomialTerm{Coefficient: big.NewRat(-2, 1), Monomial: Monomial{2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-2, 1), Monomial: Monomial{2}},
 			),
 			y: 2,
 			z: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(4, 1), Monomial: Monomial{2, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(-2, 1), Monomial: Monomial{2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-2, 1), Monomial: Monomial{1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(4, 1), Monomial: Monomial{2, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-2, 1), Monomial: Monomial{2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-2, 1), Monomial: Monomial{1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1}},
 			),
 		},
 		{
 			x: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2}},
 			),
 			y: 3,
 			z: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 2, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{2, 1, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 2, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 2, 1}},
-				PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: Monomial{1, 1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 2, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{2, 1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{2, 1, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 2, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 2, 1}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-1, 1), Monomial: Monomial{1, 1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(1, 1), Monomial: Monomial{1, 1, 1}},
 			),
 		},
 	}
@@ -3293,9 +3248,9 @@ func TestPow(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			z := NewPolynomial(Deglex)
+			z := NewPolynomial(NewRat(0, 1), Deglex)
 			z.Pow(test.x, test.y)
-			if z.Cmp(test.z) != 0 {
+			if !z.Equal(test.z) {
 				t.Errorf("%v", z)
 			}
 		})
@@ -3304,36 +3259,36 @@ func TestPow(t *testing.T) {
 
 func TestMulScalar(t *testing.T) {
 	tests := []struct {
-		x      *Polynomial
-		scalar *big.Rat
-		z      *Polynomial
+		x      *Polynomial[*Rat]
+		scalar *Rat
+		z      *Polynomial[*Rat]
 	}{
 		{
 			x: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(-2, 3), Monomial: Monomial{2, 1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(5, 1), Monomial: Monomial{2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-2, 3), Monomial: Monomial{2, 1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(5, 1), Monomial: Monomial{2}},
 			),
-			scalar: big.NewRat(-6, 1),
+			scalar: NewRat(-6, 1),
 			z: NewPolynomial(
-				Deglex,
-				PolynomialTerm{Coefficient: big.NewRat(4, 1), Monomial: Monomial{2, 1, 2}},
-				PolynomialTerm{Coefficient: big.NewRat(-30, 1), Monomial: Monomial{2}},
+				NewRat(0, 1), Deglex,
+				PolynomialTerm[*Rat]{Coefficient: NewRat(4, 1), Monomial: Monomial{2, 1, 2}},
+				PolynomialTerm[*Rat]{Coefficient: NewRat(-30, 1), Monomial: Monomial{2}},
 			),
 		},
 	}
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			z := NewPolynomial(test.z.order)
+			z := NewPolynomial(test.z.field, test.z.order)
 			z.mulScalar(test.scalar, test.x)
-			if z.Cmp(test.z) != 0 {
+			if !z.Equal(test.z) {
 				t.Errorf("%v", z)
 			}
 
-			z = NewPolynomial(Deglex).Set(test.x)
+			z = NewPolynomial(NewRat(0, 1), Deglex).Set(test.x)
 			z.mulScalar(test.scalar, z)
-			if z.Cmp(test.z) != 0 {
+			if !z.Equal(test.z) {
 				t.Errorf("%v", z)
 			}
 		})
@@ -3342,7 +3297,7 @@ func TestMulScalar(t *testing.T) {
 
 func TestHomogeneous(t *testing.T) {
 	tests := []struct {
-		f           *Polynomial
+		f           *Polynomial[*Rat]
 		homogeneous bool
 	}{
 		{
@@ -3419,25 +3374,25 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func mul(x *Polynomial, y ...*Polynomial) *Polynomial {
+func mul[K Field[K]](x *Polynomial[K], y ...*Polynomial[K]) *Polynomial[K] {
 	z := x
 	for i := range y {
-		z = NewPolynomial(z.order).Mul(z, y[i])
+		z = NewPolynomial(z.field, z.order).Mul(z, y[i])
 	}
 	return z
 }
 
-func termEq(a, b PolynomialTerm) bool {
+func termEq[K Field[K]](a, b PolynomialTerm[K]) bool {
 	if eq := monomialEq(a.Monomial, b.Monomial); !eq {
 		return false
 	}
-	if a.Coefficient.Cmp(b.Coefficient) != 0 {
+	if !a.Coefficient.Equal(b.Coefficient) {
 		return false
 	}
 	return true
 }
 
-func parseMust(variables map[string]Symbol, order Order, input string) *Polynomial {
+func parseMust(variables map[string]Symbol, order Order, input string) *Polynomial[*Rat] {
 	p, err := Parse(variables, order, input)
 	if err != nil {
 		panic(fmt.Sprintf("%+v", err))

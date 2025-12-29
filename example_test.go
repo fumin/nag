@@ -3,7 +3,6 @@ package nag_test
 import (
 	"fmt"
 	"math"
-	"math/big"
 
 	"github.com/fumin/nag"
 )
@@ -24,7 +23,7 @@ func Example() {
 
 	// Compute the Gröbner basis using the Buchberger algorithm.
 	variables := map[string]nag.Symbol{"a": 1, "b": 2}
-	ideal := make([]*nag.Polynomial, len(rules))
+	ideal := make([]*nag.Polynomial[*nag.Rat], len(rules))
 	ideal[0], _ = nag.Parse(variables, nag.ElimOrder(), rules[0])
 	basis, _ := nag.Buchberger(ideal, 50)
 	// Print the Gröbner basis and notice that we have found an additional
@@ -37,7 +36,7 @@ func Example() {
 
 	// Use the Gröbner basis to simplify the target expression.
 	exprP, _ := nag.Parse(variables, nag.ElimOrder(), expr)
-	simplified, _ := nag.Divide(nil, exprP, basis)
+	_, simplified := nag.Divide(nil, exprP, basis)
 	fmt.Printf("Simplified result: %v\n", simplified)
 
 	// Output:
@@ -73,7 +72,7 @@ func Example_equation_solving() {
 	}
 
 	variables := map[string]nag.Symbol{"D": 1, "L": 2, "X": 3, "A": 4, "B": 5, "R": 6, "G": 7}
-	ideal := make([]*nag.Polynomial, len(equations))
+	ideal := make([]*nag.Polynomial[*nag.Rat], len(equations))
 	for i, eq := range equations {
 		ideal[i], _ = nag.Parse(variables, nag.ElimOrder(), eq)
 	}
@@ -106,7 +105,7 @@ func Example_minimal_polynomial() {
 
 	// Compute the Gröbner basis.
 	variables := map[string]nag.Symbol{"x": 4, "y": 3, "z": 2, "α": 1}
-	idealP := make([]*nag.Polynomial, len(ideal))
+	idealP := make([]*nag.Polynomial[*nag.Rat], len(ideal))
 	for i, p := range ideal {
 		idealP[i], _ = nag.Parse(variables, nag.ElimOrder(), p)
 	}
@@ -168,10 +167,10 @@ func ExampleDeglex() {
 
 func ExamplePolynomial_Terms() {
 	p := nag.NewPolynomial(
-		nag.Deglex,
-		nag.PolynomialTerm{Coefficient: big.NewRat(3, 2), Monomial: nag.Monomial{1, 1, 1}},
-		nag.PolynomialTerm{Coefficient: big.NewRat(-1, 1), Monomial: nag.Monomial{2, 2}},
-		nag.PolynomialTerm{Coefficient: big.NewRat(5, 1), Monomial: nag.Monomial{1, 2}},
+		nag.NewRat(0, 1), nag.Deglex,
+		nag.PolynomialTerm[*nag.Rat]{Coefficient: nag.NewRat(3, 2), Monomial: nag.Monomial{1, 1, 1}},
+		nag.PolynomialTerm[*nag.Rat]{Coefficient: nag.NewRat(-1, 1), Monomial: nag.Monomial{2, 2}},
+		nag.PolynomialTerm[*nag.Rat]{Coefficient: nag.NewRat(5, 1), Monomial: nag.Monomial{1, 2}},
 	)
 	for coeffi, monomial := range p.Terms() {
 		fmt.Printf("coefficient: %s, monomial: %v\n", coeffi.RatString(), monomial)
@@ -184,15 +183,15 @@ func ExamplePolynomial_Terms() {
 }
 
 func ExamplePolynomial_LeadingTerm() {
-	terms := []nag.PolynomialTerm{
-		{Coefficient: big.NewRat(1, 2), Monomial: nag.Monomial{1, 1, 1}},
-		{Coefficient: big.NewRat(1, 3), Monomial: nag.Monomial{2, 2}},
+	terms := []nag.PolynomialTerm[*nag.Rat]{
+		{Coefficient: nag.NewRat(1, 2), Monomial: nag.Monomial{1, 1, 1}},
+		{Coefficient: nag.NewRat(1, 3), Monomial: nag.Monomial{2, 2}},
 	}
 
-	p0 := nag.NewPolynomial(nag.Deglex, terms...)
+	p0 := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex, terms...)
 	fmt.Println(p0.LeadingTerm())
 
-	p1 := nag.NewPolynomial(nag.ElimOrder(), terms...)
+	p1 := nag.NewPolynomial(nag.NewRat(0, 1), nag.ElimOrder(), terms...)
 	fmt.Println(p1.LeadingTerm())
 
 	// Output:
@@ -203,29 +202,29 @@ func ExamplePolynomial_LeadingTerm() {
 func ExampleDivide() {
 	variables := map[string]nag.Symbol{"x": 3, "y": 2, "z": 1}
 	f, _ := nag.Parse(variables, nag.Deglex, "zx^2yx")
-	g := make([]*nag.Polynomial, 2)
+	g := make([]*nag.Polynomial[*nag.Rat], 2)
 	g[0], _ = nag.Parse(variables, nag.Deglex, "xy + x")
 	g[1], _ = nag.Parse(variables, nag.Deglex, "x^2 + xz")
 
 	// Create a copy of f since nag.Divide modifies f upon return.
-	fCopy := nag.NewPolynomial(nag.Deglex).Set(f)
-	var remainder *nag.Polynomial
-	quotient := make([][]nag.Quotient, 0)
+	fCopy := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex).Set(f)
+	var remainder *nag.Polynomial[*nag.Rat]
+	quotient := make([][]nag.Quotient[*nag.Rat], 0)
 	// Perfom the division.
-	remainder, quotient = nag.Divide(quotient, fCopy, g)
+	quotient, remainder = nag.Divide(quotient, fCopy, g)
 	fmt.Println("remainder:", remainder)
 
 	// Check that f = quotient*g + remainder.
-	ff := nag.NewPolynomial(nag.Deglex)
+	ff := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex)
 	ff.SymbolStringer = f.SymbolStringer
-	cw := nag.NewPolynomial(nag.Deglex)
-	cwg := nag.NewPolynomial(nag.Deglex)
-	cwgw := nag.NewPolynomial(nag.Deglex)
+	cw := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex)
+	cwg := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex)
+	cwgw := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex)
 	for i := range quotient {
 		for j := range quotient[i] {
-			cij := nag.NewPolynomial(nag.Deglex, nag.PolynomialTerm{Coefficient: quotient[i][j].Coefficient})
-			wij := nag.NewPolynomial(nag.Deglex, nag.PolynomialTerm{Monomial: quotient[i][j].Left})
-			wPij := nag.NewPolynomial(nag.Deglex, nag.PolynomialTerm{Monomial: quotient[i][j].Right})
+			cij := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex, nag.PolynomialTerm[*nag.Rat]{Coefficient: quotient[i][j].Coefficient})
+			wij := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex, nag.PolynomialTerm[*nag.Rat]{Monomial: quotient[i][j].Left})
+			wPij := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex, nag.PolynomialTerm[*nag.Rat]{Monomial: quotient[i][j].Right})
 			cwgw.Mul(cwg.Mul(cw.Mul(cij, wij), g[i]), wPij)
 			ff.Add(ff, cwgw)
 		}
@@ -246,7 +245,7 @@ func ExampleBuchberger() {
 
 	// Run the Buchberger algorithm.
 	variables := map[string]nag.Symbol{"a": 1, "b": 2}
-	idealP := make([]*nag.Polynomial, len(ideal))
+	idealP := make([]*nag.Polynomial[*nag.Rat], len(ideal))
 	idealP[0], _ = nag.Parse(variables, nag.Deglex, ideal[0])
 	idealP[1], _ = nag.Parse(variables, nag.Deglex, ideal[1])
 	basis, complete := nag.Buchberger(idealP, 10)
@@ -276,7 +275,7 @@ func ExampleBuchbergerHomogeneous() {
 		"xy - 3z^2",
 	}
 	variables := map[string]nag.Symbol{"x": 1, "y": 2, "z": 3}
-	idealP := make([]*nag.Polynomial, len(ideal))
+	idealP := make([]*nag.Polynomial[*nag.Rat], len(ideal))
 	for i := range ideal {
 		idealP[i], _ = nag.Parse(variables, nag.Deglex, ideal[i])
 	}
