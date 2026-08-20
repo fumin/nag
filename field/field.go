@@ -5,10 +5,20 @@ package field
 
 import (
 	"math/big"
-	"strconv"
 
 	"github.com/fumin/nag"
 )
+
+// A Finite is an element of a finite field GF(q) with order q = p^n where p is a prime number.
+type Finite[K nag.Field[K]] interface {
+	nag.Field[K]
+	// Characteristic returns p in the finite field GF(p^n).
+	Characteristic() *big.Int
+	// PrimePower returns n in the finite field GF(p^n).
+	PrimePower() *big.Int
+	// Ith returns the i'th element in the field.
+	Ith(i *big.Int) K
+}
 
 // An IrreduciblePoly is an irreducible polynomial for the [construction] of a prime field extension.
 //
@@ -18,21 +28,21 @@ type IrreduciblePoly struct {
 }
 
 // NewIrreduciblePoly returns an irreducible polynomial for the finite field GF(p^n), where p is a prime number and n >= 1.
-func NewIrreduciblePoly(p, n int) *IrreduciblePoly {
-	k := newPrime(p, 0)
+func NewIrreduciblePoly(p *big.Int, n int) *IrreduciblePoly {
+	k := &prime{order: new(big.Int).Set(p), i: big.NewInt(0)}
 	xn := nag.NewPolynomial(k, nag.Deglex, nag.PolynomialTerm[*prime]{Coefficient: k.NewOne(), Monomial: make([]nag.Symbol, n)})
 	xn.SymbolStringer = func(nag.Symbol) string { return "x" }
-	order := expi(p, n)
-	for i := 1; i < order; i++ {
+	order := new(big.Int).Exp(p, big.NewInt(int64(n)), nil)
+	for i := big.NewInt(1); i.Cmp(order) < 0; i.Add(i, big.NewInt(1)) {
 		poly := poly0(xn).Set(xn)
 		ithPoly(poly, i, p)
 
-		factors := factorize(poly)
-		if !(len(factors) == 1 && factors[0].N == 1) {
+		factors := Factor(poly)
+		if !(len(factors) == 1 && factors[0].N.Cmp(big.NewInt(1)) == 0) {
 			continue
 		}
 		// Only check primitivity if for small orders, since this involves iterating through every element in the field.
-		if order < 1024 && !primitive(poly) {
+		if order.Cmp(big.NewInt(1024)) < 0 && !primitive(poly) {
 			continue
 		}
 		return &IrreduciblePoly{poly}
@@ -41,43 +51,42 @@ func NewIrreduciblePoly(p, n int) *IrreduciblePoly {
 }
 
 // Ext returns the i'th element in the finite field GF(p^n).
-func (irr *IrreduciblePoly) Ext(i int) *PrimeExt {
+func (irr *IrreduciblePoly) Ext(i *big.Int) *PrimeExt {
 	irrp := irr.Polynomial
-	x := &PrimeExt{irr: poly0(irrp).Set(irrp), poly: poly0(irrp)}
+	x := &PrimeExt{irr: &IrreduciblePoly{poly0(irrp).Set(irrp)}, poly: poly0(irrp)}
 
-	p, e := x.characteristic(), x.primePower()
-	order := int(exp(nag.NewRat(int64(p), 1), e).Num().Int64())
-	ith := i % order
-	ithPoly(x.poly, ith, p)
+	order := new(big.Int).Exp(x.Characteristic(), x.PrimePower(), nil)
+	ith := new(big.Int).Mod(i, order)
+	ithPoly(x.poly, ith, x.Characteristic())
 
 	return x
 }
 
 // A PrimeExt is an element in the finite field GF(p^n), where p is a prime number and n >= 1.
 type PrimeExt struct {
-	irr  *nag.Polynomial[*prime]
+	irr  *IrreduciblePoly
 	poly *nag.Polynomial[*prime]
 }
 
 // NewZero returns the additive identity 0.
 func (x *PrimeExt) NewZero() *PrimeExt {
 	y := &PrimeExt{}
-	y.irr = poly0(x.irr).Set(x.irr)
-	y.poly = poly0(y.irr)
+	y.irr = &IrreduciblePoly{poly0(x.irr.Polynomial).Set(x.irr.Polynomial)}
+	y.poly = poly0(y.irr.Polynomial)
 	return y
 }
 
 // NewOne returns the multiplicative identity 1.
 func (x *PrimeExt) NewOne() *PrimeExt {
 	y := &PrimeExt{}
-	y.irr = poly0(x.irr).Set(x.irr)
-	y.poly = poly1(y.irr)
+	y.irr = &IrreduciblePoly{poly0(x.irr.Polynomial).Set(x.irr.Polynomial)}
+	y.poly = poly1(y.irr.Polynomial)
 	return y
 }
 
 // Equal reports whether x and y are equal.
 func (x *PrimeExt) Equal(y *PrimeExt) bool {
-	if !x.irr.Equal(y.irr) {
+	if !x.irr.Polynomial.Equal(y.irr.Polynomial) {
 		return false
 	}
 	if !x.poly.Equal(y.poly) {
@@ -88,16 +97,16 @@ func (x *PrimeExt) Equal(y *PrimeExt) bool {
 
 // Add sets z to the sum x+y and returns z.
 func (z *PrimeExt) Add(x, y *PrimeExt) *PrimeExt {
-	z.irr.Set(x.irr)
+	z.irr.Polynomial.Set(x.irr.Polynomial)
 	z.poly.Add(x.poly, y.poly)
-	_, remainder := divide(z.poly, z.irr)
+	_, remainder := divide(z.poly, z.irr.Polynomial)
 	z.poly.Set(remainder)
 	return z
 }
 
 // Sub sets z to the difference x-y and returns z.
 func (z *PrimeExt) Sub(x, y *PrimeExt) *PrimeExt {
-	z.irr.Set(x.irr)
+	z.irr.Polynomial.Set(x.irr.Polynomial)
 
 	// Compute negative of y.poly.
 	k := z.irr.Field()
@@ -106,14 +115,14 @@ func (z *PrimeExt) Sub(x, y *PrimeExt) *PrimeExt {
 	negY := mulScalar(y.poly, neg1)
 
 	z.poly.Add(x.poly, negY)
-	_, remainder := divide(z.poly, z.irr)
+	_, remainder := divide(z.poly, z.irr.Polynomial)
 	z.poly.Set(remainder)
 	return z
 }
 
 // Mul sets z to the product x*y and returns z.
 func (z *PrimeExt) Mul(x, y *PrimeExt) *PrimeExt {
-	z.irr.Set(x.irr)
+	z.irr.Polynomial.Set(x.irr.Polynomial)
 
 	xp := x.poly
 	if xp == z.poly {
@@ -125,7 +134,7 @@ func (z *PrimeExt) Mul(x, y *PrimeExt) *PrimeExt {
 	}
 	z.poly.Mul(xp, yp)
 
-	_, remainder := divide(z.poly, z.irr)
+	_, remainder := divide(z.poly, z.irr.Polynomial)
 	z.poly.Set(remainder)
 	return z
 }
@@ -139,27 +148,32 @@ func (z *PrimeExt) Div(x, y *PrimeExt) *PrimeExt {
 
 // Inv sets z to 1/x and returns z.
 func (z *PrimeExt) Inv(x *PrimeExt) *PrimeExt {
-	z.irr.Set(x.irr)
-	z.poly.Set(inverse(x.poly, z.irr))
+	z.irr.Polynomial.Set(x.irr.Polynomial)
+	z.poly.Set(inverse(x.poly, z.irr.Polynomial))
 	return z
 }
 
 // String returns the integer representation of x.
 func (x *PrimeExt) String() string {
-	p := x.characteristic()
-	var ith int
+	p := x.Characteristic()
+	ith := big.NewInt(0)
 	for c, w := range x.poly.Terms() {
-		ith += int(c.i.Int64()) * expi(p, len(w))
+		incr := new(big.Int).Mul(c.i, new(big.Int).Exp(p, big.NewInt(int64(len(w))), nil))
+		ith.Add(ith, incr)
 	}
-	return strconv.Itoa(ith)
+	return ith.String()
 }
 
-func (x *PrimeExt) characteristic() int {
-	return x.irr.LeadingTerm().Coefficient.characteristic()
+func (x *PrimeExt) Characteristic() *big.Int {
+	return x.irr.LeadingTerm().Coefficient.Characteristic()
 }
 
-func (x *PrimeExt) primePower() int {
-	return len(x.irr.LeadingTerm().Monomial)
+func (x *PrimeExt) PrimePower() *big.Int {
+	return big.NewInt(int64(len(x.irr.LeadingTerm().Monomial)))
+}
+
+func (x *PrimeExt) Ith(i *big.Int) *PrimeExt {
+	return x.irr.Ext(i)
 }
 
 type prime struct {
@@ -167,10 +181,6 @@ type prime struct {
 	order *big.Int
 	// I is the integer representation of the element.
 	i *big.Int
-}
-
-func newPrime(p, i int) *prime {
-	return &prime{order: big.NewInt(int64(p)), i: big.NewInt(int64(i))}
 }
 
 func (x *prime) NewZero() *prime {
@@ -226,8 +236,12 @@ func (x *prime) String() string {
 	return x.i.String()
 }
 
-func (x *prime) characteristic() int {
-	return int(x.order.Int64())
+func (x *prime) Characteristic() *big.Int {
+	return big.NewInt(0).Set(x.order)
 }
 
-func (x *prime) primePower() int { return 1 }
+func (x *prime) PrimePower() *big.Int { return big.NewInt(1) }
+
+func (x *prime) Ith(i *big.Int) *prime {
+	return &prime{order: new(big.Int).Set(x.order), i: new(big.Int).Set(i)}
+}

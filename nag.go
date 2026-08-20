@@ -20,30 +20,36 @@ import (
 	"github.com/jba/omap"
 )
 
+// A Group is an element satisfying the [group] axioms.
+//
+// [group]: https://en.wikipedia.org/wiki/Group_(mathematics)
+type Group[T any] interface {
+	// NewOne returns the multiplicative identity of the field.
+	NewOne() T
+	// Equal reports whether x and y are equal, where x is the method receiver.
+	Equal(y T) bool
+	// Mul sets z to the product x*y and returns z, where z is the method receiver.
+	Mul(x, y T) T
+	// Inv sets z to 1/x and returns z, where z is the method receiver.
+	Inv(x T) T
+	// String returns the string representation.
+	String() string
+}
+
 // A Field is an element whose addition and multiplication operations satisfy the [field] axioms.
 //
 // [field]: https://en.wikipedia.org/wiki/Field_(mathematics)
 type Field[T any] interface {
 	// NewZero returns the additive identity of the field.
 	NewZero() T
-	// NewOne returns the multiplicative identity of the field.
-	NewOne() T
-
-	// Equal reports whether x and y are equal, where x is the method receiver.
-	Equal(y T) bool
 	// Add sets z to the sum x+y and returns z, where z is the method receiver.
 	Add(x, y T) T
 	// Sub sets z to the difference x-y and returns z, where z is the method receiver.
 	Sub(x, y T) T
-	// Mul sets z to the product x*y and returns z, where z is the method receiver.
-	Mul(x, y T) T
+	// Group provides the multiplication operation.
+	Group[T]
 	// Div sets z to the quotient x/y and returns z, where z is the method receiver.
 	Div(x, y T) T
-	// Inv sets z to 1/x and returns z, where z is the method receiver.
-	Inv(x T) T
-
-	// String returns the string representation.
-	String() string
 }
 
 // A Rat represents a quotient of arbitrary precision.
@@ -337,7 +343,7 @@ func (x *Polynomial[K]) addTerm(sign int, term PolynomialTerm[K]) {
 	tc := term.Coefficient
 	tcv := reflect.ValueOf(tc)
 	kind := tcv.Kind()
-	if (kind == reflect.Ptr || kind == reflect.Interface) && tcv.IsNil() {
+	if (kind == reflect.Pointer || kind == reflect.Interface) && tcv.IsNil() {
 		tc = x.field.NewOne()
 	}
 	if sign < 0 {

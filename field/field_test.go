@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
+	"math/big"
 	"testing"
 )
 
@@ -225,7 +227,7 @@ func TestPrimeExt(t *testing.T) {
 	for testI, test := range tests {
 		t.Run(fmt.Sprintf("%d", testI), func(t *testing.T) {
 			t.Parallel()
-			order := expi(test.p, test.e)
+			order := int(math.Pow(float64(test.p), float64(test.e)))
 			sub := make([][]int, order)
 			div := make([][]int, order)
 			for i := range order {
@@ -239,29 +241,29 @@ func TestPrimeExt(t *testing.T) {
 				}
 			}
 
-			irr := NewIrreduciblePoly(test.p, test.e)
+			irr := NewIrreduciblePoly(big.NewInt(int64(test.p)), test.e)
 			for i := range order {
 				for j := range order {
-					x, y := irr.Ext(i), irr.Ext(j)
-					if z := irr.Ext(0).Add(x, y); !z.Equal(irr.Ext(test.add[i][j])) {
+					x, y := irr.Ext(big.NewInt(int64(i))), irr.Ext(big.NewInt(int64(j)))
+					if z := irr.Ext(big.NewInt(0)).Add(x, y); !z.Equal(irr.Ext(big.NewInt(int64(test.add[i][j])))) {
 						t.Errorf("Add(%v %v): got %v want %d", x, y, z, test.add[i][j])
 					}
-					if z := irr.Ext(0).Sub(x, y); !z.Equal(irr.Ext(sub[i][j])) {
+					if z := irr.Ext(big.NewInt(0)).Sub(x, y); !z.Equal(irr.Ext(big.NewInt(int64(sub[i][j])))) {
 						t.Errorf("Sub(%v %v): got %v want %d", x, y, z, sub[i][j])
 					}
-					if z := irr.Ext(0).Mul(x, y); !z.Equal(irr.Ext(test.mul[i][j])) {
+					if z := irr.Ext(big.NewInt(0)).Mul(x, y); !z.Equal(irr.Ext(big.NewInt(int64(test.mul[i][j])))) {
 						t.Errorf("Mul(%v %v): got %v want %d", x, y, z, test.mul[i][j])
 					}
 					if j != 0 {
-						if z := irr.Ext(0).Div(x, y); !z.Equal(irr.Ext(div[i][j])) {
+						if z := irr.Ext(big.NewInt(0)).Div(x, y); !z.Equal(irr.Ext(big.NewInt(int64(div[i][j])))) {
 							t.Errorf("Div(%v %v): got %v want %d", x, y, z, div[i][j])
 						}
 					}
 				}
 			}
 			for i := 1; i < order; i++ {
-				x := irr.Ext(i)
-				if z := irr.Ext(0).Inv(x); !z.Equal(irr.Ext(div[1][i])) {
+				x := irr.Ext(big.NewInt(int64(i)))
+				if z := irr.Ext(big.NewInt(0)).Inv(x); !z.Equal(irr.Ext(big.NewInt(int64(div[1][i])))) {
 					t.Errorf("Inv(%v): got %v want %d", x, z, div[1][i])
 				}
 			}
@@ -300,8 +302,8 @@ func TestIrreduciblePoly(t *testing.T) {
 	for testI, test := range tests {
 		t.Run(fmt.Sprintf("%d", testI), func(t *testing.T) {
 			t.Parallel()
-			tirr := parseMust(test.p, test.irr)
-			irr := NewIrreduciblePoly(test.p, test.n).Polynomial
+			tirr := parseMust(primeField(big.NewInt(int64(test.p))), test.irr)
+			irr := NewIrreduciblePoly(big.NewInt(int64(test.p)), test.n).Polynomial
 			if !irr.Equal(tirr) {
 				t.Errorf("IrreduciblePoly(%d, %d): got %v want %v", test.p, test.n, irr, tirr)
 			}
@@ -476,4 +478,8 @@ func TestMain(m *testing.M) {
 	log.SetFlags(log.Lmicroseconds | log.Llongfile | log.LstdFlags)
 
 	m.Run()
+}
+
+func newPrime(p, i int) *prime {
+	return &prime{order: big.NewInt(int64(p)), i: big.NewInt(int64(i))}
 }
