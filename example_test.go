@@ -2,7 +2,10 @@ package nag_test
 
 import (
 	"fmt"
+	"iter"
+	"maps"
 	"math"
+	"slices"
 
 	"github.com/fumin/nag"
 )
@@ -25,7 +28,8 @@ func Example() {
 	variables := map[string]nag.Symbol{"a": 1, "b": 2}
 	ideal := make([]*nag.Polynomial[*nag.Rat], len(rules))
 	ideal[0], _ = nag.Parse(variables, nag.ElimOrder(), rules[0])
-	basis, _ := nag.Buchberger(ideal, 50)
+	stop := func(iter.Seq[*nag.Polynomial[*nag.Rat]]) bool { return false }
+	basis, _ := nag.Buchberger(ideal, stop)
 	// Print the Gröbner basis and notice that we have found an additional
 	// useful relation: bba = abb
 	fmt.Printf("Gröbner basis:\n")
@@ -76,7 +80,9 @@ func Example_equation_solving() {
 	for i, eq := range equations {
 		ideal[i], _ = nag.Parse(variables, nag.ElimOrder(), eq)
 	}
-	basis, _ := nag.Buchberger(ideal, 50)
+	var i int
+	stop := func(iter.Seq[*nag.Polynomial[*nag.Rat]]) bool { i++; return i > 50 }
+	basis, _ := nag.Buchberger(ideal, stop)
 	solution := basis[len(basis)-1]
 	fmt.Printf("Solution: %v = 0\n", solution)
 
@@ -94,13 +100,6 @@ func Example_minimal_polynomial() {
 		"y^2 - 3",
 		"z^2 - 5",
 		"α - x - y - z",
-		// Equations below express the fact that all variables commute.
-		"xy - yx",
-		"xz - zx",
-		"xα - αx",
-		"yz - zy",
-		"yα - αy",
-		"zα - αz",
 	}
 
 	// Compute the Gröbner basis.
@@ -109,7 +108,9 @@ func Example_minimal_polynomial() {
 	for i, p := range ideal {
 		idealP[i], _ = nag.Parse(variables, nag.ElimOrder(), p)
 	}
-	basis, _ := nag.Buchberger(idealP, 50)
+	idealP = appendCommute(idealP, variables)
+	stop := func(iter.Seq[*nag.Polynomial[*nag.Rat]]) bool { return false }
+	basis, _ := nag.Buchberger(idealP, stop)
 	fmt.Printf("Gröbner basis:\n")
 	for _, b := range basis {
 		fmt.Printf("  %v = 0\n", b)
@@ -140,6 +141,85 @@ func Example_minimal_polynomial() {
 	//   x-1/576α^7+7/144α^5+7/72α^3-5/3α = 0
 	//
 	// minPoly(α): 0.000000
+}
+
+func Example_multivariate_gcd() {
+	// This example shows how to compute the greatest common divisor
+	// of two commutative multivariate polynomials f and g,
+	// using the algorithm in Proposition 14 of Chapter 4.3,
+	// Ideals, Varieties, and Algorithms, D. Cox, J. Little, D. O'Shea.
+	variables := map[string]nag.Symbol{"x": 0, "y": 1}
+	f := "3xy^2 + x^2y^2 + 7yx^2 + 21xy + 2y^2 + 12x^2 + 14y + 36x + 24"
+	g := "4xy^2 + x^2y^2 + 6yx^2 + 24xy + 3y^2 + 8x^2 + 18y + 32x + 24"
+
+	// Compute the least common multiple.
+	//
+	// Let I, J be two ideals, by Theorem 11 of Chapter 4.3,
+	//
+	// 	I ∩ J = (tI + (1-t)J) ∩ k[x, y, ...]
+	//
+	// Therefore, the Gröbner basis for I ∩ J can be computed by running the
+	// Buchberger algorithm on (tI + (1-t)J), and then excluding terms
+	// containg the variable "t".
+	//
+	// Moreover, when I and J are ideals of single functions, I=<f>, J=<g>,
+	// I ∩ J = <h>, where h = lcm(f, g) by Proposition 13 Chapter 4.3.
+	//
+	// First step, make f and g homogeneous so that we can use the
+	// homoegeneous version of Buchberger which guarantees a completion at
+	// degree deg(f*g)+1.
+	variables["h"] = nag.Symbol(len(variables))
+	pf, _ := nag.Parse(variables, nag.Deglex, f)
+	pg, _ := nag.Parse(variables, nag.Deglex, g)
+	fgDeg := len(pf.LeadingTerm().Monomial) + len(pg.LeadingTerm().Monomial)
+	hf := homogenize(variables["h"], pf)
+	hg := homogenize(variables["h"], pg)
+	// Second step, add the "t" variable for ideal intersection.
+	variables["t"] = nag.Symbol(len(variables))
+	order := nag.ElimOrder()
+	ti, _ := nag.Parse(variables, order, fmt.Sprintf("t(%s)", hf))
+	tj, _ := nag.Parse(variables, order, fmt.Sprintf("(h-t)(%s)", hg))
+	ideal := []*nag.Polynomial[*nag.Rat]{ti, tj}
+	ideal = appendCommute(ideal, variables)
+	basis, _ := nag.BuchbergerHomogeneous(ideal, fgDeg+1)
+	// noT returns whether p contains the variable "t".
+	noT := func(p *nag.Polynomial[*nag.Rat]) bool {
+		for _, m := range p.Terms() {
+			if slices.Contains(m, variables["t"]) {
+				return false
+			}
+		}
+		return !isCommuteRelation(p)
+	}
+	hlcm := basis[slices.IndexFunc(basis, noT)]
+	lcm := dehomogenize(variables["h"], hlcm)
+	monicize(lcm)
+
+	// gcd(f, g) = (f * g) / lcm(f, g).
+	fp, _ := nag.Parse(variables, order, f)
+	gp, _ := nag.Parse(variables, order, g)
+	fg := nag.NewPolynomial(fp.Field(), fp.Order()).Mul(fp, gp)
+	ideal = []*nag.Polynomial[*nag.Rat]{lcm}
+	ideal = appendCommute(ideal, variables)
+	quotient := make([][]nag.Quotient[*nag.Rat], 0)
+	quotient, _ = nag.Divide(quotient, fg, ideal)
+	gcm := nag.NewPolynomial(lcm.Field(), lcm.Order())
+	gcm.SymbolStringer = lcm.SymbolStringer
+	for _, q := range quotient[0] {
+		term := nag.NewPolynomial(gcm.Field(), gcm.Order(), nag.PolynomialTerm[*nag.Rat]{Coefficient: q.Coefficient, Monomial: append(q.Left, q.Right...)})
+		gcm.Add(gcm, term)
+	}
+
+	fmt.Println("f:", fp)
+	fmt.Println("g:", gp)
+	fmt.Println("least common multiple:", lcm)
+	fmt.Println("greatest common divisor:", gcm)
+
+	// Output:
+	// f: x^2y^2+3xy^2+2y^2+7yx^2+21xy+14y+12x^2+36x+24
+	// g: x^2y^2+4xy^2+3y^2+6yx^2+24xy+18y+8x^2+32x+24
+	// least common multiple: x^3y^3+6x^2y^3+11xy^3+6y^3+9x^3y^2+54x^2y^2+99xy^2+54y^2+26x^3y+156x^2y+286xy+156y+24x^3+144x^2+264x+144
+	// greatest common divisor: xy+y+4x+4
 }
 
 func ExampleElimOrder() {
@@ -223,8 +303,8 @@ func ExampleDivide() {
 	for i := range quotient {
 		for j := range quotient[i] {
 			cij := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex, nag.PolynomialTerm[*nag.Rat]{Coefficient: quotient[i][j].Coefficient})
-			wij := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex, nag.PolynomialTerm[*nag.Rat]{Monomial: quotient[i][j].Left})
-			wPij := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex, nag.PolynomialTerm[*nag.Rat]{Monomial: quotient[i][j].Right})
+			wij := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex, nag.PolynomialTerm[*nag.Rat]{Coefficient: nag.NewRat(1, 1), Monomial: quotient[i][j].Left})
+			wPij := nag.NewPolynomial(nag.NewRat(0, 1), nag.Deglex, nag.PolynomialTerm[*nag.Rat]{Coefficient: nag.NewRat(1, 1), Monomial: quotient[i][j].Right})
 			cwgw.Mul(cwg.Mul(cw.Mul(cij, wij), g[i]), wPij)
 			ff.Add(ff, cwgw)
 		}
@@ -248,7 +328,8 @@ func ExampleBuchberger() {
 	idealP := make([]*nag.Polynomial[*nag.Rat], len(ideal))
 	idealP[0], _ = nag.Parse(variables, nag.Deglex, ideal[0])
 	idealP[1], _ = nag.Parse(variables, nag.Deglex, ideal[1])
-	basis, complete := nag.Buchberger(idealP, 10)
+	stop := func(iter.Seq[*nag.Polynomial[*nag.Rat]]) bool { return false }
+	basis, complete := nag.Buchberger(idealP, stop)
 
 	// Print the computed Gröbner basis.
 	fmt.Println("Gröbner basis:")
@@ -334,4 +415,104 @@ func ExampleParse() {
 	// coefficient: -1, monomial: [1 1 2 2 2]
 	// coefficient: 5/3, monomial: [2 1]
 	// coefficient: -5/3, monomial: [1 1]
+}
+
+func appendCommute[K nag.Field[K]](ideal []*nag.Polynomial[K], variables map[string]nag.Symbol) []*nag.Polynomial[K] {
+	k := ideal[0].Field()
+	one, neg1 := k.NewOne(), k.Sub(k.NewZero(), k.NewOne())
+	vs := slices.Collect(maps.Values(variables))
+	for i := range vs {
+		for j := i + 1; j < len(vs); j++ {
+			commute := nag.NewPolynomial(k, ideal[0].Order(),
+				nag.PolynomialTerm[K]{
+					Coefficient: one,
+					Monomial:    []nag.Symbol{vs[i], vs[j]}},
+				nag.PolynomialTerm[K]{
+					Coefficient: neg1,
+					Monomial:    []nag.Symbol{vs[j], vs[i]}})
+			commute.SymbolStringer = ideal[0].SymbolStringer
+			ideal = append(ideal, commute)
+		}
+	}
+	return ideal
+}
+
+func isCommuteRelation[K nag.Field[K]](p *nag.Polynomial[K]) bool {
+	if p.Len() != 2 {
+		return false
+	}
+	var c0, c1 K
+	var m0, m1 []nag.Symbol
+	i := -1
+	for c, m := range p.Terms() {
+		i++
+		switch i {
+		case 0:
+			c0, m0 = c, m
+		case 1:
+			c1, m1 = c, m
+		}
+	}
+
+	// Check that c0 == -c1.
+	zero := c1.NewZero()
+	negC1 := zero.Sub(zero, c1)
+	if !c0.Equal(negC1) {
+		return false
+	}
+
+	// Check that m0 = reverse(m1).
+	if !(len(m0) == 2 && len(m1) == 2) {
+		return false
+	}
+	if !(m0[0] == m1[1] && m0[1] == m1[0]) {
+		return false
+	}
+
+	return true
+}
+
+func homogenize[K nag.Field[K]](h nag.Symbol, p *nag.Polynomial[K]) *nag.Polynomial[K] {
+	deg := 0
+	for _, m := range p.Terms() {
+		deg = max(deg, len(m))
+	}
+
+	hp := nag.NewPolynomial(p.Field(), p.Order())
+	hp.SymbolStringer = p.SymbolStringer
+	for c, m := range p.Terms() {
+		hm := make([]nag.Symbol, deg)
+		copy(hm, m)
+		for i := len(m); i < deg; i++ {
+			hm[i] = h
+		}
+
+		term := nag.NewPolynomial(p.Field(), p.Order(), nag.PolynomialTerm[K]{Coefficient: c, Monomial: hm})
+		hp.Add(hp, term)
+	}
+	return hp
+}
+
+func dehomogenize[K nag.Field[K]](h nag.Symbol, hp *nag.Polynomial[K]) *nag.Polynomial[K] {
+	p := nag.NewPolynomial(hp.Field(), hp.Order())
+	p.SymbolStringer = hp.SymbolStringer
+	for c, hm := range hp.Terms() {
+		m := make([]nag.Symbol, 0)
+		for _, s := range hm {
+			if s != h {
+				m = append(m, s)
+			}
+		}
+
+		term := nag.NewPolynomial(p.Field(), p.Order(), nag.PolynomialTerm[K]{Coefficient: c, Monomial: m})
+		p.Add(p, term)
+	}
+	return p
+}
+
+func monicize[K nag.Field[K]](p *nag.Polynomial[K]) {
+	lc := p.LeadingTerm().Coefficient
+	invlc := lc.NewZero().Inv(lc)
+	lcp := nag.NewPolynomial(p.Field(), p.Order(), nag.PolynomialTerm[K]{Coefficient: invlc})
+	p.Mul(p, lcp)
 }

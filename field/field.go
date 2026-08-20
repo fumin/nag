@@ -4,162 +4,301 @@
 package field
 
 import (
+	"fmt"
 	"math/big"
-	"strconv"
 
 	"github.com/fumin/nag"
 )
 
-// An IrreduciblePoly is an irreducible polynomial for the [construction] of a prime field extension.
+// An Extension is a field extension [constructed] from irreducible polynomials.
 //
-// [construction]: https://en.wikipedia.org/wiki/Finite_field#Explicit_construction
-type IrreduciblePoly struct {
-	*nag.Polynomial[*prime]
-}
-
-// NewIrreduciblePoly returns an irreducible polynomial for the finite field GF(p^n), where p is a prime number and n >= 1.
-func NewIrreduciblePoly(p, n int) *IrreduciblePoly {
-	k := newPrime(p, 0)
-	xn := nag.NewPolynomial(k, nag.Deglex, nag.PolynomialTerm[*prime]{Coefficient: k.NewOne(), Monomial: make([]nag.Symbol, n)})
-	xn.SymbolStringer = func(nag.Symbol) string { return "x" }
-	order := expi(p, n)
-	for i := 1; i < order; i++ {
-		poly := poly0(xn).Set(xn)
-		ithPoly(poly, i, p)
-
-		factors := factorize(poly)
-		if !(len(factors) == 1 && factors[0].N == 1) {
-			continue
-		}
-		// Only check primitivity if for small orders, since this involves iterating through every element in the field.
-		if order < 1024 && !primitive(poly) {
-			continue
-		}
-		return &IrreduciblePoly{poly}
-	}
-	panic("unable to find irreducible polynomial")
-}
-
-// Ext returns the i'th element in the finite field GF(p^n).
-func (irr *IrreduciblePoly) Ext(i int) *PrimeExt {
-	irrp := irr.Polynomial
-	x := &PrimeExt{irr: poly0(irrp).Set(irrp), poly: poly0(irrp)}
-
-	p, e := x.characteristic(), x.primePower()
-	order := int(exp(nag.NewRat(int64(p), 1), e).Num().Int64())
-	ith := i % order
-	ithPoly(x.poly, ith, p)
-
-	return x
-}
-
-// A PrimeExt is an element in the finite field GF(p^n), where p is a prime number and n >= 1.
-type PrimeExt struct {
-	irr  *nag.Polynomial[*prime]
-	poly *nag.Polynomial[*prime]
+// [constructed]: https://en.wikipedia.org/wiki/Finite_field#Explicit_construction
+type Extension[K nag.Field[K]] struct {
+	// Irr is the irreducible polynomial modulus.
+	Irr *nag.Polynomial[K]
+	// Poly is the polynomial representing the element.
+	Poly *nag.Polynomial[K]
 }
 
 // NewZero returns the additive identity 0.
-func (x *PrimeExt) NewZero() *PrimeExt {
-	y := &PrimeExt{}
-	y.irr = poly0(x.irr).Set(x.irr)
-	y.poly = poly0(y.irr)
+func (x *Extension[K]) NewZero() *Extension[K] {
+	y := &Extension[K]{}
+	y.Irr = poly0(x.Irr).Set(x.Irr)
+	y.Poly = poly0(y.Irr)
 	return y
 }
 
 // NewOne returns the multiplicative identity 1.
-func (x *PrimeExt) NewOne() *PrimeExt {
-	y := &PrimeExt{}
-	y.irr = poly0(x.irr).Set(x.irr)
-	y.poly = poly1(y.irr)
+func (x *Extension[K]) NewOne() *Extension[K] {
+	y := &Extension[K]{}
+	y.Irr = poly0(x.Irr).Set(x.Irr)
+	y.Poly = poly1(y.Irr)
 	return y
 }
 
 // Equal reports whether x and y are equal.
-func (x *PrimeExt) Equal(y *PrimeExt) bool {
-	if !x.irr.Equal(y.irr) {
+func (x *Extension[K]) Equal(y *Extension[K]) bool {
+	if !x.Irr.Equal(y.Irr) {
 		return false
 	}
-	if !x.poly.Equal(y.poly) {
+	if !x.Poly.Equal(y.Poly) {
 		return false
 	}
 	return true
 }
 
+// Set sets x to y.
+func (x *Extension[K]) Set(y *Extension[K]) *Extension[K] {
+	x.Irr.Set(y.Irr)
+	x.Poly.Set(y.Poly)
+	return x
+}
+
 // Add sets z to the sum x+y and returns z.
-func (z *PrimeExt) Add(x, y *PrimeExt) *PrimeExt {
-	z.irr.Set(x.irr)
-	z.poly.Add(x.poly, y.poly)
-	_, remainder := divide(z.poly, z.irr)
-	z.poly.Set(remainder)
+func (z *Extension[K]) Add(x, y *Extension[K]) *Extension[K] {
+	z.Irr.Set(x.Irr)
+	z.Poly.Add(x.Poly, y.Poly)
+	_, remainder := divide(z.Poly, z.Irr)
+	z.Poly.Set(remainder)
 	return z
 }
 
 // Sub sets z to the difference x-y and returns z.
-func (z *PrimeExt) Sub(x, y *PrimeExt) *PrimeExt {
-	z.irr.Set(x.irr)
+func (z *Extension[K]) Sub(x, y *Extension[K]) *Extension[K] {
+	z.Irr.Set(x.Irr)
 
-	// Compute negative of y.poly.
-	k := z.irr.Field()
+	// Compute negative of y.Poly.
+	k := z.Irr.Field()
 	neg1 := k.NewZero()
 	neg1.Sub(neg1, k.NewOne())
-	negY := mulScalar(y.poly, neg1)
+	negY := mulScalar(y.Poly, neg1)
 
-	z.poly.Add(x.poly, negY)
-	_, remainder := divide(z.poly, z.irr)
-	z.poly.Set(remainder)
+	z.Poly.Add(x.Poly, negY)
+	_, remainder := divide(z.Poly, z.Irr)
+	z.Poly.Set(remainder)
 	return z
 }
 
 // Mul sets z to the product x*y and returns z.
-func (z *PrimeExt) Mul(x, y *PrimeExt) *PrimeExt {
-	z.irr.Set(x.irr)
-
-	xp := x.poly
-	if xp == z.poly {
-		xp = poly0(xp).Set(xp)
-	}
-	yp := y.poly
-	if yp == z.poly {
-		yp = poly0(yp).Set(yp)
-	}
-	z.poly.Mul(xp, yp)
-
-	_, remainder := divide(z.poly, z.irr)
-	z.poly.Set(remainder)
+func (z *Extension[K]) Mul(x, y *Extension[K]) *Extension[K] {
+	z.Irr.Set(x.Irr)
+	z.Poly.Mul(x.Poly, y.Poly)
+	_, remainder := divide(z.Poly, z.Irr)
+	z.Poly.Set(remainder)
 	return z
 }
 
 // Div sets z to the quotient x/y and returns z.
-func (z *PrimeExt) Div(x, y *PrimeExt) *PrimeExt {
+func (z *Extension[K]) Div(x, y *Extension[K]) *Extension[K] {
 	yInv := z.NewZero().Inv(y)
 	z.Mul(x, yInv)
 	return z
 }
 
 // Inv sets z to 1/x and returns z.
-func (z *PrimeExt) Inv(x *PrimeExt) *PrimeExt {
-	z.irr.Set(x.irr)
-	z.poly.Set(inverse(x.poly, z.irr))
+func (z *Extension[K]) Inv(x *Extension[K]) *Extension[K] {
+	if x.Poly.Len() == 0 {
+		panic("no inverse for 0")
+	}
+	z.Irr.Set(x.Irr)
+	z.Poly.Set(inverse(x.Poly, z.Irr))
 	return z
 }
 
-// String returns the integer representation of x.
-func (x *PrimeExt) String() string {
-	p := x.characteristic()
-	var ith int
-	for c, w := range x.poly.Terms() {
-		ith += int(c.i.Int64()) * expi(p, len(w))
+// String returns the coefficient representation of x.
+func (x *Extension[K]) String() string {
+	coeffs := x.Coeffs()
+	zero := coeffs[0].NewZero()
+	isScalar := true
+	for i := 1; i < len(coeffs); i++ {
+		if !coeffs[i].Equal(zero) {
+			isScalar = false
+			break
+		}
 	}
-	return strconv.Itoa(ith)
+	if isScalar {
+		return coeffs[0].String()
+	}
+	return fmt.Sprintf("%v", x.Coeffs())
 }
 
-func (x *PrimeExt) characteristic() int {
-	return x.irr.LeadingTerm().Coefficient.characteristic()
+// Degree returns the [degree] of the field extension.
+//
+// [degree]: https://en.wikipedia.org/wiki/Degree_of_a_field_extension
+func (x *Extension[K]) Degree() int {
+	return len(x.Irr.LeadingTerm().Monomial)
 }
 
-func (x *PrimeExt) primePower() int {
-	return len(x.irr.LeadingTerm().Monomial)
+// SetCoeffs sets the coefficients of the polynomial representation of x.
+func (x *Extension[K]) SetCoeffs(coefficients ...K) *Extension[K] {
+	k := x.Irr.Field()
+	x.Poly = poly0(x.Poly)
+	for deg, coeff := range coefficients {
+		c := k.NewZero().Set(coeff)
+		w := make([]nag.Symbol, deg)
+		x.Poly.Add(x.Poly, nag.NewPolynomial(k, x.Poly.Order(), nag.PolynomialTerm[K]{Coefficient: c, Monomial: w}))
+	}
+	return x
+}
+
+// Coeffs returns the coefficients of x's polynomial representation.
+func (x *Extension[K]) Coeffs() []K {
+	k := x.Irr.Field()
+	coeffs := make([]K, x.Degree())
+	for i := range coeffs {
+		coeffs[i] = k.NewZero()
+	}
+
+	for c, w := range x.Poly.Terms() {
+		d := len(w)
+		coeffs[d].Set(c)
+	}
+	return coeffs
+}
+
+// A Finite is an element of a finite field GF(q) with order q = p^n
+// where p is a prime number, and n is a positive integer.
+type Finite[K nag.Field[K]] interface {
+	nag.Field[K]
+	// SetCoeffs sets the polynomial representation of the receiver.
+	SetCoeffs(...*big.Int) K
+	// Coeffs returns the polynomial representation.
+	Coeffs() []*big.Int
+	// Degree returns the degree of the finite field.
+	Degree() int
+	// Characteristic returns the characteristic the finite field.
+	Characteristic() *big.Int
+}
+
+// A PrimeExt is an element of a finite field GF(q) with order q = p^n
+// where p is a prime number, and n is a positive integer.
+type PrimeExt Extension[*prime]
+
+// NewPrimeExt returns an element of the finite field GF(p, len(irr)-1).
+// The coefficients of the irreducible polynomial defining the field is irr.
+func NewPrimeExt(p *big.Int, irr []*big.Int) *PrimeExt {
+	k := &prime{order: new(big.Int).Set(p), i: big.NewInt(0)}
+	poly := nag.NewPolynomial(k, nag.Deglex)
+	poly.SymbolStringer = func(nag.Symbol) string { return "x" }
+	for deg, cIth := range irr {
+		c := setIth(k.NewZero(), cIth)
+		w := make([]nag.Symbol, deg)
+		poly.Add(poly, nag.NewPolynomial(k, poly.Order(), nag.PolynomialTerm[*prime]{Coefficient: c, Monomial: w}))
+	}
+	x := &PrimeExt{Irr: poly}
+	x.Poly = poly0(x.Irr)
+	return x
+}
+
+// NewPrimeExtDeg returns an element of the finite field GF(p, n).
+// The irreducible polynomial is automatically calculated.
+func NewPrimeExtDeg(p *big.Int, n int) *PrimeExt {
+	k := &prime{order: new(big.Int).Set(p), i: big.NewInt(0)}
+	xn := nag.NewPolynomial(k, nag.Deglex, nag.PolynomialTerm[*prime]{Coefficient: k.NewOne(), Monomial: make([]nag.Symbol, n)})
+	xn.SymbolStringer = func(nag.Symbol) string { return "x" }
+	irr := nag.NewPolynomial(xn.Field(), xn.Order())
+
+	order := new(big.Int).Exp(p, big.NewInt(int64(n)), nil)
+	for i := big.NewInt(1); i.Cmp(order) < 0; i.Add(i, big.NewInt(1)) {
+		irr.Set(xn)
+		ithPoly(irr, i, p)
+
+		factors := Factor(irr)
+		if !(len(factors) == 1 && factors[0].N.Cmp(big.NewInt(1)) == 0) {
+			continue
+		}
+		// Only check primitivity if for small orders, since this involves iterating through every element in the field.
+		if order.Cmp(big.NewInt(1024)) < 0 && !primitive(irr) {
+			continue
+		}
+		return &PrimeExt{Irr: irr, Poly: poly0(irr)}
+	}
+	panic("unable to find irreducible polynomial")
+}
+
+// NewZero returns the additive identity 0.
+func (x *PrimeExt) NewZero() *PrimeExt {
+	return (*PrimeExt)((*Extension[*prime])(x).NewZero())
+}
+
+// NewOne returns the multiplicative identity 1.
+func (x *PrimeExt) NewOne() *PrimeExt {
+	return (*PrimeExt)((*Extension[*prime])(x).NewOne())
+}
+
+// Equal reports whether x and y are equal.
+func (x *PrimeExt) Equal(y *PrimeExt) bool {
+	return (*Extension[*prime])(x).Equal((*Extension[*prime])(y))
+}
+
+// Set sets x to y.
+func (x *PrimeExt) Set(y *PrimeExt) *PrimeExt {
+	return (*PrimeExt)((*Extension[*prime])(x).Set((*Extension[*prime])(y)))
+}
+
+// Add sets z to the sum x+y and returns z.
+func (z *PrimeExt) Add(x, y *PrimeExt) *PrimeExt {
+	return (*PrimeExt)((*Extension[*prime])(z).Add((*Extension[*prime])(x), (*Extension[*prime])(y)))
+}
+
+// Sub sets z to the difference x-y and returns z.
+func (z *PrimeExt) Sub(x, y *PrimeExt) *PrimeExt {
+	return (*PrimeExt)((*Extension[*prime])(z).Sub((*Extension[*prime])(x), (*Extension[*prime])(y)))
+}
+
+// Mul sets z to the product x*y and returns z.
+func (z *PrimeExt) Mul(x, y *PrimeExt) *PrimeExt {
+	return (*PrimeExt)((*Extension[*prime])(z).Mul((*Extension[*prime])(x), (*Extension[*prime])(y)))
+}
+
+// Div sets z to the quotient x/y and returns z.
+func (z *PrimeExt) Div(x, y *PrimeExt) *PrimeExt {
+	return (*PrimeExt)((*Extension[*prime])(z).Div((*Extension[*prime])(x), (*Extension[*prime])(y)))
+}
+
+// Inv sets x to 1/y and returns x.
+func (x *PrimeExt) Inv(y *PrimeExt) *PrimeExt {
+	return (*PrimeExt)((*Extension[*prime])(x).Inv((*Extension[*prime])(y)))
+}
+
+// String returns the coefficient representation of x.
+func (x *PrimeExt) String() string {
+	return (*Extension[*prime])(x).String()
+}
+
+// SetCoeffs sets the coefficients of the polynomial representation of x.
+func (x *PrimeExt) SetCoeffs(cs ...*big.Int) *PrimeExt {
+	k := x.Poly.Field()
+	coeffs := make([]*prime, len(cs))
+	for i := range coeffs {
+		coeffs[i] = k.NewZero()
+		coeffs[i].i.Set(cs[i])
+	}
+	return (*PrimeExt)((*Extension[*prime])(x).SetCoeffs(coeffs...))
+}
+
+// Coeffs returns the coefficients of x's polynomial representation.
+func (x *PrimeExt) Coeffs() []*big.Int {
+	coeffs := (*Extension[*prime])(x).Coeffs()
+	cs := make([]*big.Int, len(coeffs))
+	for i := range cs {
+		cs[i] = new(big.Int).Set(coeffs[i].i)
+	}
+	return cs
+}
+
+// Degree returns the [degree] of the field extension.
+//
+// [degree]: https://en.wikipedia.org/wiki/Degree_of_a_field_extension
+func (x *PrimeExt) Degree() int {
+	return (*Extension[*prime])(x).Degree()
+}
+
+// Characteristic returns the [characteristic] of the field.
+//
+// [characteristic]: https://en.wikipedia.org/wiki/Characteristic_(algebra)
+func (x *PrimeExt) Characteristic() *big.Int {
+	return x.Irr.LeadingTerm().Coefficient.Characteristic()
 }
 
 type prime struct {
@@ -167,10 +306,6 @@ type prime struct {
 	order *big.Int
 	// I is the integer representation of the element.
 	i *big.Int
-}
-
-func newPrime(p, i int) *prime {
-	return &prime{order: big.NewInt(int64(p)), i: big.NewInt(int64(i))}
 }
 
 func (x *prime) NewZero() *prime {
@@ -183,6 +318,12 @@ func (x *prime) NewOne() *prime {
 
 func (x *prime) Equal(y *prime) bool {
 	return (x.order.Cmp(y.order) == 0) && (x.i.Cmp(y.i) == 0)
+}
+
+func (x *prime) Set(y *prime) *prime {
+	x.order.Set(y.order)
+	x.i.Set(y.i)
+	return x
 }
 
 func (z *prime) Add(x, y *prime) *prime {
@@ -226,8 +367,33 @@ func (x *prime) String() string {
 	return x.i.String()
 }
 
-func (x *prime) characteristic() int {
-	return int(x.order.Int64())
+func (x *prime) Characteristic() *big.Int {
+	return big.NewInt(0).Set(x.order)
 }
 
-func (x *prime) primePower() int { return 1 }
+func (x *prime) Degree() int { return 1 }
+
+func (x *prime) SetCoeffs(coefficients ...*big.Int) *prime {
+	x.i.Set(coefficients[0])
+	return x
+}
+
+func (x *prime) Coeffs() []*big.Int {
+	return []*big.Int{x.i}
+}
+
+// setIth sets x to the i'th element in the field and returns x.
+func setIth[K Finite[K]](x K, i *big.Int) K {
+	i = new(big.Int).Set(i)
+	p := x.Characteristic()
+	r := new(big.Int)
+	coeffs := make([]*big.Int, 0)
+	for i.Sign() != 0 {
+		i.QuoRem(i, p, r)
+		coeffs = append(coeffs, new(big.Int).Set(r))
+	}
+	if len(coeffs) == 0 {
+		coeffs = append(coeffs, big.NewInt(0))
+	}
+	return x.SetCoeffs(coeffs...)
+}

@@ -4,7 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
+	"math/big"
+	"slices"
 	"testing"
+
+	"github.com/fumin/nag"
 )
 
 func TestPrimeExt(t *testing.T) {
@@ -225,7 +230,7 @@ func TestPrimeExt(t *testing.T) {
 	for testI, test := range tests {
 		t.Run(fmt.Sprintf("%d", testI), func(t *testing.T) {
 			t.Parallel()
-			order := expi(test.p, test.e)
+			order := int(math.Pow(float64(test.p), float64(test.e)))
 			sub := make([][]int, order)
 			div := make([][]int, order)
 			for i := range order {
@@ -239,29 +244,29 @@ func TestPrimeExt(t *testing.T) {
 				}
 			}
 
-			irr := NewIrreduciblePoly(test.p, test.e)
+			k := NewPrimeExtDeg(big.NewInt(int64(test.p)), test.e)
 			for i := range order {
 				for j := range order {
-					x, y := irr.Ext(i), irr.Ext(j)
-					if z := irr.Ext(0).Add(x, y); !z.Equal(irr.Ext(test.add[i][j])) {
+					x, y := ith(k, i), ith(k, j)
+					if z := k.NewZero().Add(x, y); !z.Equal(ith(k, test.add[i][j])) {
 						t.Errorf("Add(%v %v): got %v want %d", x, y, z, test.add[i][j])
 					}
-					if z := irr.Ext(0).Sub(x, y); !z.Equal(irr.Ext(sub[i][j])) {
+					if z := k.NewZero().Sub(x, y); !z.Equal(ith(k, sub[i][j])) {
 						t.Errorf("Sub(%v %v): got %v want %d", x, y, z, sub[i][j])
 					}
-					if z := irr.Ext(0).Mul(x, y); !z.Equal(irr.Ext(test.mul[i][j])) {
+					if z := k.NewZero().Mul(x, y); !z.Equal(ith(k, test.mul[i][j])) {
 						t.Errorf("Mul(%v %v): got %v want %d", x, y, z, test.mul[i][j])
 					}
 					if j != 0 {
-						if z := irr.Ext(0).Div(x, y); !z.Equal(irr.Ext(div[i][j])) {
+						if z := k.NewZero().Div(x, y); !z.Equal(ith(k, div[i][j])) {
 							t.Errorf("Div(%v %v): got %v want %d", x, y, z, div[i][j])
 						}
 					}
 				}
 			}
 			for i := 1; i < order; i++ {
-				x := irr.Ext(i)
-				if z := irr.Ext(0).Inv(x); !z.Equal(irr.Ext(div[1][i])) {
+				x := ith(k, i)
+				if z := k.NewZero().Inv(x); !z.Equal(ith(k, div[1][i])) {
 					t.Errorf("Inv(%v): got %v want %d", x, z, div[1][i])
 				}
 			}
@@ -300,10 +305,43 @@ func TestIrreduciblePoly(t *testing.T) {
 	for testI, test := range tests {
 		t.Run(fmt.Sprintf("%d", testI), func(t *testing.T) {
 			t.Parallel()
-			tirr := parseMust(test.p, test.irr)
-			irr := NewIrreduciblePoly(test.p, test.n).Polynomial
+			tirr := parseMust(primeField(big.NewInt(int64(test.p))), test.irr)
+			irr := NewPrimeExtDeg(big.NewInt(int64(test.p)), test.n).Irr
 			if !irr.Equal(tirr) {
 				t.Errorf("IrreduciblePoly(%d, %d): got %v want %v", test.p, test.n, irr, tirr)
+			}
+		})
+	}
+}
+
+func TestIrreduciblePolyCoeff(t *testing.T) {
+	tests := []struct {
+		p    int64
+		irr  []int64
+		pow  int64
+		want []int64
+	}{
+		{
+			p: 41, irr: []int64{35, 1, 0, 1},
+			pow: 3, want: []int64{6, 40, 0},
+		},
+	}
+
+	for testI, test := range tests {
+		t.Run(fmt.Sprintf("%d", testI), func(t *testing.T) {
+			irrCs := make([]*big.Int, 0, len(test.irr))
+			for _, c := range test.irr {
+				irrCs = append(irrCs, big.NewInt(c))
+			}
+			x := NewPrimeExt(big.NewInt(test.p), irrCs).SetCoeffs(big.NewInt(0), big.NewInt(1))
+			xp := nag.Pow(x, big.NewInt(test.pow))
+			coeffs := xp.Coeffs()
+			got := make([]int64, len(coeffs))
+			for deg, c := range coeffs {
+				got[deg] = c.Int64()
+			}
+			if !slices.Equal(got, test.want) {
+				t.Errorf("got %v want %v", got, test.want)
 			}
 		})
 	}
@@ -471,9 +509,17 @@ func TestPrimeEqual(t *testing.T) {
 	}
 }
 
+func ith(k *PrimeExt, i int) *PrimeExt {
+	return setIth(k.NewZero(), big.NewInt(int64(i)))
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds | log.Llongfile | log.LstdFlags)
 
 	m.Run()
+}
+
+func newPrime(p, i int) *prime {
+	return &prime{order: big.NewInt(int64(p)), i: big.NewInt(int64(i))}
 }

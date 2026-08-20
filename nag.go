@@ -13,12 +13,55 @@ import (
 	"iter"
 	"math"
 	"math/big"
-	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/jba/omap"
 )
+
+// A Magma is an element satifying the [magma] axoims.
+//
+// [magma]: https://en.wikipedia.org/wiki/Magma_(algebra)
+type Magma[T any] interface {
+	// Equal reports whether x and y are equal, where x is the method receiver.
+	Equal(y T) bool
+	// Set sets x to y, where x is the method receiver.
+	Set(y T) T
+	// Mul sets z to the product x*y and returns z, where z is the method receiver.
+	Mul(x, y T) T
+	// String returns the string representation.
+	String() string
+}
+
+// A Group is an element satisfying the [group] axioms.
+//
+// [group]: https://en.wikipedia.org/wiki/Group_(mathematics)
+type Group[T any] interface {
+	Magma[T]
+	// NewOne returns the multiplicative identity of the field.
+	NewOne() T
+	// Inv sets z to 1/x and returns z, where z is the method receiver.
+	Inv(x T) T
+}
+
+// Pow returns x^n.
+func Pow[G Group[G]](x G, n *big.Int) G {
+	switch {
+	case n.Sign() < 0:
+		return Pow(x.Inv(x), n.Neg(n))
+	case n.Sign() == 0:
+		return x.NewOne()
+	case new(big.Int).Rem(n, big.NewInt(2)).Sign() == 0:
+		half := n.Div(n, big.NewInt(2))
+		return Pow(x.Mul(x, x), half)
+	default:
+		n.Sub(n, big.NewInt(1))
+		half := n.Div(n, big.NewInt(2))
+
+		x2 := x.NewOne().Mul(x, x)
+		return x.Mul(x, Pow(x2, half))
+	}
+}
 
 // A Field is an element whose addition and multiplication operations satisfy the [field] axioms.
 //
@@ -26,24 +69,14 @@ import (
 type Field[T any] interface {
 	// NewZero returns the additive identity of the field.
 	NewZero() T
-	// NewOne returns the multiplicative identity of the field.
-	NewOne() T
-
-	// Equal reports whether x and y are equal, where x is the method receiver.
-	Equal(y T) bool
 	// Add sets z to the sum x+y and returns z, where z is the method receiver.
 	Add(x, y T) T
 	// Sub sets z to the difference x-y and returns z, where z is the method receiver.
 	Sub(x, y T) T
-	// Mul sets z to the product x*y and returns z, where z is the method receiver.
-	Mul(x, y T) T
+	// Group provides the multiplication operation.
+	Group[T]
 	// Div sets z to the quotient x/y and returns z, where z is the method receiver.
 	Div(x, y T) T
-	// Inv sets z to 1/x and returns z, where z is the method receiver.
-	Inv(x T) T
-
-	// String returns the string representation.
-	String() string
 }
 
 // A Rat represents a quotient of arbitrary precision.
@@ -62,6 +95,17 @@ func (x *Rat) NewOne() *Rat {
 	return &Rat{big.NewRat(1, 1)}
 }
 
+// Equal reports whether x and y are equal.
+func (x *Rat) Equal(y *Rat) bool {
+	return x.Rat.Cmp(y.Rat) == 0
+}
+
+// Set sets x to y.
+func (x *Rat) Set(y *Rat) *Rat {
+	x.Rat.Set(y.Rat)
+	return x
+}
+
 // Add sets z to the sum x+y and returns z.
 func (z *Rat) Add(x, y *Rat) *Rat { return &Rat{z.Rat.Add(x.Rat, y.Rat)} }
 
@@ -76,11 +120,6 @@ func (z *Rat) Div(x, y *Rat) *Rat { return &Rat{z.Rat.Quo(x.Rat, y.Rat)} }
 
 // Inv sets z to 1/x and returns z. If x == 0, Inv panics.
 func (z *Rat) Inv(x *Rat) *Rat { return &Rat{z.Rat.Inv(x.Rat)} }
-
-// Equal reports whether x and y are equal.
-func (x *Rat) Equal(y *Rat) bool {
-	return x.Rat.Cmp(y.Rat) == 0
-}
 
 // String returns a string representation of x in the form "a/b" if b != 1, and in the form "a" if b == 1.
 func (x *Rat) String() string {
@@ -244,43 +283,19 @@ func (z *Polynomial[K]) Add(x, y *Polynomial[K]) *Polynomial[K] {
 
 // Mul sets z to the product x*y and returns z.
 func (z *Polynomial[K]) Mul(x, y *Polynomial[K]) *Polynomial[K] {
-	if z == x {
-		panic(fmt.Sprintf("z == x"))
+	xm, ym := x.m, y.m
+	if z == x || z == y {
+		z.m = omap.NewMapFunc[Monomial, K](z.order)
 	}
-	if z == y {
-		panic(fmt.Sprintf("z == y"))
-	}
-
 	z.m.Clear()
-	for xw, xc := range x.m.Backward() {
-		for yw, yc := range y.m.Backward() {
+	for xw, xc := range xm.Backward() {
+		for yw, yc := range ym.Backward() {
 			c := z.field.Mul(xc, yc)
 			w := make(Monomial, 0, len(xw)+len(yw))
 			w = append(append(w, xw...), yw...)
 			z.addTerm(1, PolynomialTerm[K]{Coefficient: c, Monomial: w})
 		}
 	}
-
-	return z
-}
-
-// Pow sets z to the power x^y and returns z.
-func (z *Polynomial[K]) Pow(x *Polynomial[K], y int) *Polynomial[K] {
-	if z == x {
-		panic("z == x")
-	}
-
-	z.Set(x)
-	buf := NewPolynomial[K](z.field, z.order)
-	for range y - 1 {
-		buf.Mul(z, x)
-		z, buf = buf, z
-	}
-	if y%2 == 0 {
-		z, buf = buf, z
-		z.Set(buf)
-	}
-
 	return z
 }
 
@@ -334,16 +349,10 @@ func (x *Polynomial[K]) addTerm(sign int, term PolynomialTerm[K]) {
 		c = x.field.NewZero()
 	}
 
-	tc := term.Coefficient
-	tcv := reflect.ValueOf(tc)
-	kind := tcv.Kind()
-	if (kind == reflect.Ptr || kind == reflect.Interface) && tcv.IsNil() {
-		tc = x.field.NewOne()
-	}
 	if sign < 0 {
-		c.Sub(c, tc)
+		c.Sub(c, term.Coefficient)
 	} else {
-		c.Add(c, tc)
+		c.Add(c, term.Coefficient)
 	}
 
 	if c.Equal(x.field.NewZero()) {
@@ -456,13 +465,16 @@ func Divide[K Field[K]](quotient [][]Quotient[K], f *Polynomial[K], g []*Polynom
 	return quotient, p
 }
 
+// A StopFunc determines whether to early stop a Buchberger run.
+type StopFunc[K Field[K]] func(basis iter.Seq[*Polynomial[K]]) bool
+
 // Buchberger returns the Gröbner basis of the ideal g, using the Buchberger algorithm.
 // For noncummutative algebras, a Gröbner basis may not be finite and therefore only a partial basis can be computed.
-// In this case, upon reaching maxIter without a complete basis, Buchberger sets complete to false.
+// In this case, upon being early stopped without a complete basis, Buchberger sets complete to false.
 // For more details, please see Theorem 4.2.24, Xiu Xingqiang.
 //
 // Xiu, Xingqiang. "Non-commutative Gröbner bases and applications." PhD diss., Universität Passau, 2012.
-func Buchberger[K Field[K]](g []*Polynomial[K], maxIter int) (basis []*Polynomial[K], complete bool) {
+func Buchberger[K Field[K]](g []*Polynomial[K], stop StopFunc[K]) (basis []*Polynomial[K], complete bool) {
 	// Buffers.
 	r0 := g[0].field.NewZero()
 	buf := &Monomial{}
@@ -484,6 +496,16 @@ func Buchberger[K Field[K]](g []*Polynomial[K], maxIter int) (basis []*Polynomia
 			}
 		}
 	}
+	var iterBasis iter.Seq[*Polynomial[K]] = func(yield func(*Polynomial[K]) bool) {
+		for i, p := range g {
+			if t[i] != nil { // skip deleted polynomial
+				continue
+			}
+			if !yield(p) {
+				return
+			}
+		}
+	}
 	// b is the set of obstructions.
 	var b []obstruction[K]
 	for l := 1; l <= len(g); l++ {
@@ -491,9 +513,12 @@ func Buchberger[K Field[K]](g []*Polynomial[K], maxIter int) (basis []*Polynomia
 		b = addObstructions(b, gl, buf)
 	}
 
-	for range maxIter {
+	for {
 		if len(b) == 0 {
 			complete = true
+			break
+		}
+		if stop(iterBasis) {
 			break
 		}
 
@@ -1032,7 +1057,9 @@ func homogeneous[K Field[K]](x *Polynomial[K]) bool {
 }
 
 func englishSymbolStringer(s Symbol) string {
-	return string((s % 26) - 1 + 'a')
+	const alphabetLen = 26
+	i := (s + alphabetLen - 3) % alphabetLen
+	return string(i + 'a')
 }
 
 func printSymbol(b *strings.Builder, s Symbol, power int, symbolStringer func(Symbol) string) {
@@ -1137,4 +1164,25 @@ func polynomialCmp[K Field[K]](x, y *Polynomial[K]) int {
 		}
 	}
 	return 0
+}
+
+// MPow returns x^n.
+func MPow[T Magma[T]](x T, n *big.Int, newFunc func() T) T {
+	switch {
+	case n.Sign() < 0:
+		panic("no inverse")
+	case n.Sign() == 0:
+		panic("no identity")
+	case n.Cmp(big.NewInt(1)) == 0:
+		return x
+	case new(big.Int).Rem(n, big.NewInt(2)).Sign() == 0:
+		half := n.Div(n, big.NewInt(2))
+		return MPow(x.Mul(x, x), half, newFunc)
+	default:
+		n.Sub(n, big.NewInt(1))
+		half := n.Div(n, big.NewInt(2))
+
+		x2 := newFunc().Mul(x, x)
+		return x.Mul(x, MPow(x2, half, newFunc))
+	}
 }
