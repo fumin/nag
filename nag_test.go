@@ -12,7 +12,9 @@ package nag
 import (
 	"flag"
 	"fmt"
+	"iter"
 	"log"
+	"math/big"
 	"slices"
 	"testing"
 )
@@ -1895,7 +1897,9 @@ func TestBuchberger(t *testing.T) {
 			ideal := make([]*Polynomial[*Rat], len(test.ideal))
 			copy(ideal, test.ideal)
 
-			basis, complete := Buchberger(ideal, test.maxiter)
+			var i int
+			stop := func(iter.Seq[*Polynomial[*Rat]]) bool { i++; return i > test.maxiter }
+			basis, complete := Buchberger(ideal, stop)
 			if len(basis) != len(test.basis) {
 				t.Fatalf("%d %v", len(basis), basis)
 			}
@@ -3206,7 +3210,7 @@ func TestPolynomialMul(t *testing.T) {
 func TestPow(t *testing.T) {
 	tests := []struct {
 		x *Polynomial[*Rat]
-		y int
+		y int64
 		z *Polynomial[*Rat]
 	}{
 		{
@@ -3248,8 +3252,9 @@ func TestPow(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
-			z := NewPolynomial(NewRat(0, 1), Deglex)
-			z.Pow(test.x, test.y)
+			newFunc := func() *Polynomial[*Rat] { return NewPolynomial(test.x.field, test.x.order) }
+			z := newFunc().Set(test.x)
+			MPow(z, big.NewInt(test.y), newFunc)
 			if !z.Equal(test.z) {
 				t.Errorf("%v", z)
 			}

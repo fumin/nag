@@ -139,7 +139,7 @@ func (l *Scanner) emit(t Type) stateFn {
 	return nil
 }
 
-func (l *Scanner) errorf(format string, args ...interface{}) stateFn {
+func (l *Scanner) errorf(format string, args ...any) stateFn {
 	l.token = Token{
 		Type:     Error,
 		Text:     fmt.Sprintf(format, args...),

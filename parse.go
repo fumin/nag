@@ -3,6 +3,7 @@ package nag
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -134,11 +135,14 @@ func evaluatePower(n *parse.Node, variables map[string]Symbol, order Order) (*Po
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("%#v", n))
 	}
-	right, err := strconv.Atoi(n.Right.Token.Text)
+	right, err := strconv.ParseInt(n.Right.Token.Text, 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("%#v", n))
 	}
-	z := NewPolynomial(NewRat(0, 1), order).Pow(left, right)
+
+	newFunc := func() *Polynomial[*Rat] { return NewPolynomial(left.field, left.order) }
+	z := newFunc().Set(left)
+	MPow(z, big.NewInt(right), newFunc)
 	return z, nil
 }
 
